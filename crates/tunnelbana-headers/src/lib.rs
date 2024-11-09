@@ -169,7 +169,7 @@ fn add_headers<B>(
     res: Result<Response<B>, Infallible>,
     bonus_headers: Option<BonusHeaders>,
 ) -> Result<Response<B>, Infallible> {
-    let mut inner = res.unwrap(); // This is 100% fine. Infallible is unconstructable.
+    let Ok(mut inner) = res;
     let resp_headers = inner.headers_mut();
     if let Some(bonus_headers) = bonus_headers {
         for (name, value) in bonus_headers.iter() {
