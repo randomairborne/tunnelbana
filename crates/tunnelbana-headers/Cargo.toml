@@ -1,15 +1,20 @@
 [package]
-name = "tunnelbana-tower"
+name = "tunnelbana-headers"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+# http
 tower = "0.5"
 http = "1"
 http-body = "1"
 http-body-util = "0.1"
 bytes = "1"
-tracing = "0.1"
-matchit = "0.8"
+
+# utils
 pin-project = "1"
+tracing = "0.1"
 thiserror = "2"
+
+# router
+matchit = "0.8"

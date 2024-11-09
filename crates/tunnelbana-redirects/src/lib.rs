@@ -7,77 +7,125 @@ use std::{
 };
 
 use bytes::Bytes;
-use http::{header, HeaderName, HeaderValue, Request, Response, StatusCode};
+use http::{header, HeaderValue, Request, Response, StatusCode};
 use http_body_util::{combinators::UnsyncBoxBody, BodyExt};
 use matchit::Router;
 use tower::{Layer, Service};
 
-type BonusHeaders = Arc<[(HeaderName, HeaderValue)]>;
-
 #[macro_use]
 extern crate tracing;
 
-mod headers;
-mod redirects;
-
-pub use headers::{parse as headers, HeaderGroup, HeaderParseError, HeaderParseErrorKind};
-pub use redirects::{parse as redirects, Redirect, RedirectParseError, RedirectParseErrorKind};
-
 #[derive(Clone)]
-pub struct TunnelbanaLayer {
-    redirects: Arc<matchit::Router<(HeaderValue, StatusCode)>>,
-    headers: Arc<matchit::Router<BonusHeaders>>,
+pub struct Redirect {
+    pub path: String,
+    pub target: HeaderValue,
+    pub code: StatusCode,
 }
 
-impl TunnelbanaLayer {
-    pub fn new(header_list: Vec<HeaderGroup>, redirect_list: Vec<Redirect>) -> Result<Self, Error> {
+pub fn parse(redirect_file: &str) -> Result<Vec<Redirect>, RedirectParseError> {
+    let mut redirects = Vec::new();
+    for (idx, line) in redirect_file.lines().enumerate() {
+        if line.is_empty() || line.starts_with('#') {
+            // handle comments
+            continue;
+        }
+
+        let items = line.split(' ').collect::<Vec<&str>>();
+        info!(line = idx + 1, ?items, "Items for line");
+        if !(2..=3).contains(&items.len()) {
+            return Err(RedirectParseError::new(
+                RedirectParseErrorKind::WrongOptCount(items.len()),
+                idx,
+            ));
+        }
+
+        let path = items[0].to_string();
+        let Ok(target) = HeaderValue::from_str(items[1]) else {
+            return Err(RedirectParseError::new(
+                RedirectParseErrorKind::HeaderValue(items[1].to_string()),
+                idx,
+            ));
+        };
+
+        let code: StatusCode = if let Some(code_str) = items.get(2) {
+            let Ok(code) = code_str.parse() else {
+                return Err(RedirectParseError::new(
+                    RedirectParseErrorKind::StatusCode(code_str.to_string()),
+                    idx,
+                ));
+            };
+            code
+        } else {
+            StatusCode::TEMPORARY_REDIRECT
+        };
+        redirects.push(Redirect { path, target, code });
+    }
+    Ok(redirects)
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("{kind}")]
+pub struct RedirectParseError {
+    row: usize,
+    #[source]
+    kind: RedirectParseErrorKind,
+}
+
+impl RedirectParseError {
+    fn new(kind: RedirectParseErrorKind, idx: usize) -> Self {
+        Self { row: idx + 1, kind }
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum RedirectParseErrorKind {
+    #[error("Wrong number of entries on a line: {0}, expected 2 or 3")]
+    WrongOptCount(usize),
+    #[error("`{0}` is an invalid header value")]
+    HeaderValue(String),
+    #[error("`{0}` could not be converted to a status")]
+    StatusCode(String),
+}
+
+#[derive(Clone)]
+pub struct RedirectsLayer {
+    redirects: Arc<matchit::Router<(HeaderValue, StatusCode)>>,
+}
+
+impl RedirectsLayer {
+    pub fn new(redirect_list: Vec<Redirect>) -> Result<Self, Error> {
         let mut redirects = Router::new();
         for redirect in redirect_list {
             redirects.insert(redirect.path, (redirect.target, redirect.code))?;
         }
 
-        let mut headers = Router::new();
-        for header in header_list {
-            headers.insert(header.path, header.targets.into())?;
-        }
-
-        info!(?headers, ?redirects, "Build the subway");
+        info!(?redirects, "Built redirect list");
 
         Ok(Self {
             redirects: Arc::new(redirects),
-            headers: Arc::new(headers),
         })
     }
 }
 
-impl<S> Layer<S> for TunnelbanaLayer {
-    type Service = Tunnelbana<S>;
+impl<S> Layer<S> for RedirectsLayer {
+    type Service = Redirects<S>;
 
-    fn layer(&self, inner: S) -> Tunnelbana<S> {
-        Tunnelbana {
+    fn layer(&self, inner: S) -> Redirects<S> {
+        Redirects {
             redirects: self.redirects.clone(),
-            headers: self.headers.clone(),
             inner,
         }
     }
 }
 
 #[derive(Clone)]
-pub struct Tunnelbana<S> {
+pub struct Redirects<S> {
     redirects: Arc<matchit::Router<(HeaderValue, StatusCode)>>,
-    headers: Arc<matchit::Router<BonusHeaders>>,
     inner: S,
 }
 
-#[pin_project::pin_project]
-pub struct ResponseFuture<F> {
-    #[pin]
-    src: ResponseSource<F>,
-    additional_headers: Option<BonusHeaders>,
-}
-
 #[pin_project::pin_project(project = PinResponseSource)]
-pub enum ResponseSource<F> {
+pub enum ResponseFuture<F> {
     Child(#[pin] F),
     Redirect(HeaderValue, StatusCode),
 }
@@ -90,14 +138,12 @@ where
     type Output = Result<Response<UnsyncBoxBody<Bytes, BE>>, Infallible>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let bonus_headers = self.additional_headers.clone();
-        match self.project().src.project() {
+        match self.project() {
             PinResponseSource::Redirect(header_value, status) => {
                 Poll::Ready(Ok(redirect_respond(header_value.clone(), *status)))
             }
             PinResponseSource::Child(f) => f.poll(cx).map(unsync_box_body_ify),
         }
-        .map(|v| add_headers(v, bonus_headers))
     }
 }
 
@@ -108,20 +154,6 @@ where
     B: http_body::Body<Data = Bytes, Error = BE> + Send + 'static,
 {
     res.map(|inner| inner.map(UnsyncBoxBody::new))
-}
-
-fn add_headers<B>(
-    res: Result<Response<B>, Infallible>,
-    bonus_headers: Option<BonusHeaders>,
-) -> Result<Response<B>, Infallible> {
-    let mut inner = res.unwrap(); // This is 100% fine. Infallible is unconstructable.
-    let resp_headers = inner.headers_mut();
-    if let Some(bonus_headers) = bonus_headers {
-        for (name, value) in bonus_headers.iter() {
-            resp_headers.insert(name.clone(), value.clone());
-        }
-    }
-    Ok(inner)
 }
 
 fn redirect_respond<E>(
@@ -136,7 +168,7 @@ fn redirect_respond<E>(
     response
 }
 
-impl<ReqBody, F, FResBody, FResBodyError> Service<Request<ReqBody>> for Tunnelbana<F>
+impl<ReqBody, F, FResBody, FResBodyError> Service<Request<ReqBody>> for Redirects<F>
 where
     F: Service<Request<ReqBody>, Response = Response<FResBody>, Error = Infallible> + Clone,
     F::Future: Send + 'static,
@@ -153,17 +185,10 @@ where
 
     fn call(&mut self, req: http::Request<ReqBody>) -> Self::Future {
         let path = req.uri().path();
-        let additional_headers = self.headers.at(path).ok().map(|v| v.value.clone());
         if let Ok(location) = self.redirects.at(path) {
-            ResponseFuture {
-                src: ResponseSource::Redirect(location.value.0.clone(), location.value.1),
-                additional_headers,
-            }
+            ResponseFuture::Redirect(location.value.0.clone(), location.value.1)
         } else {
-            ResponseFuture {
-                src: ResponseSource::Child(self.inner.call(req)),
-                additional_headers,
-            }
+            ResponseFuture::Child(self.inner.call(req))
         }
     }
 }

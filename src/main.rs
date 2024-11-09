@@ -22,7 +22,9 @@ use tower_http::{
     set_status::{SetStatus, SetStatusLayer},
     validate_request::ValidateRequestHeaderLayer,
 };
-use tunnelbana_tower::TunnelbanaLayer;
+use tracing::Level;
+use tunnelbana_headers::HeadersLayer;
+use tunnelbana_redirects::RedirectsLayer;
 
 #[macro_use]
 extern crate tracing;
@@ -31,7 +33,9 @@ const RESERVED_PATHS: [&str; 2] = ["/_headers", "/_redirects"];
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    tracing_subscriber::fmt().init();
+    tracing_subscriber::fmt()
+        .with_max_level(Level::DEBUG)
+        .init();
     let arg1 = std::env::args_os()
         .nth(1)
         .display_expect("Expected exactly 1 argument");
@@ -43,13 +47,17 @@ async fn main() {
 
     let headers = read_with_default_if_nonexistent(location.join("_headers"))
         .display_expect("Failed to read _headers");
-    let headers = tunnelbana_tower::headers(&headers).display_expect("Failed to parse _headers");
+    let headers = tunnelbana_headers::parse(&headers).display_expect("Failed to parse _headers");
 
     let redirects = read_with_default_if_nonexistent(location.join("_redirects"))
         .display_expect("Failed to read _redirects");
-    let redirects = tunnelbana_tower::redirects(&redirects).display_expect("Failed to parse _redirects");
+    let redirects =
+        tunnelbana_redirects::parse(&redirects).display_expect("Failed to parse _redirects");
 
-    let tunnelbanna = TunnelbanaLayer::new(headers, redirects).display_expect("Failed to build routers");
+    let redirect_mw =
+        RedirectsLayer::new(redirects).display_expect("Failed to build redirects router");
+    let header_add_mw = HeadersLayer::new(headers).display_expect("Failed to build headers router");
+
     let not_found_svc = ServeFile::new(location.join("404.html"))
         .precompressed_br()
         .precompressed_deflate()
@@ -87,7 +95,8 @@ async fn main() {
     );
 
     let service = ServiceBuilder::new()
-        .layer(tunnelbanna)
+        .layer(header_add_mw)
+        .layer(redirect_mw)
         .layer(hide_special_files)
         .map_response(|res: Response<_>| res.map(UnsyncBoxBody::new))
         .service(serve_dir);

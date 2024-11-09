@@ -661,17 +661,34 @@ dependencies = [
  "http",
  "http-body-util",
  "hyper-util",
+ "thiserror",
  "tokio",
  "tower",
  "tower-http",
  "tracing",
  "tracing-subscriber",
- "tunnelbana-tower",
+ "tunnelbana-headers",
+ "tunnelbana-redirects",
  "vss",
 ]
 
 [[package]]
-name = "tunnelbana-tower"
+name = "tunnelbana-headers"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "http",
+ "http-body",
+ "http-body-util",
+ "matchit",
+ "pin-project",
+ "thiserror",
+ "tower",
+ "tracing",
+]
+
+[[package]]
+name = "tunnelbana-redirects"
 version = "0.1.0"
 dependencies = [
  "bytes",

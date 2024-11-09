@@ -4,5 +4,8 @@
 /download.txt
     Content-Disposition: attachment
 
+/google
+    x-google-sucks: true
+
 /folder/{*v}
     in-folder: true
