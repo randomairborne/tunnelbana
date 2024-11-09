@@ -23,6 +23,7 @@ use tower_http::{
     validate_request::ValidateRequestHeaderLayer,
 };
 use tracing::Level;
+use tunnelbana_etags::{ETagLayer, ETagMap};
 use tunnelbana_headers::HeadersLayer;
 use tunnelbana_redirects::RedirectsLayer;
 
@@ -31,11 +32,15 @@ extern crate tracing;
 
 const RESERVED_PATHS: [&str; 2] = ["/_headers", "/_redirects"];
 
+#[cfg(debug_assertions)]
+const LOG_LEVEL: Level = Level::TRACE;
+
+#[cfg(not(debug_assertions))]
+const LOG_LEVEL: Level = Level::INFO;
+
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_max_level(Level::DEBUG)
-        .init();
+    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
     let arg1 = std::env::args_os()
         .nth(1)
         .display_expect("Expected exactly 1 argument");
@@ -54,9 +59,13 @@ async fn main() {
     let redirects =
         tunnelbana_redirects::parse(&redirects).display_expect("Failed to parse _redirects");
 
+    let etags = ETagMap::new(&location).display_expect("Failed to generate etags");
+
     let redirect_mw =
         RedirectsLayer::new(redirects).display_expect("Failed to build redirects router");
     let header_add_mw = HeadersLayer::new(headers).display_expect("Failed to build headers router");
+
+    let etag_mw = ETagLayer::new(etags);
 
     let not_found_svc = ServeFile::new(location.join("404.html"))
         .precompressed_br()
@@ -97,6 +106,7 @@ async fn main() {
     let service = ServiceBuilder::new()
         .layer(header_add_mw)
         .layer(redirect_mw)
+        .layer(etag_mw)
         .layer(hide_special_files)
         .map_response(|res: Response<_>| res.map(UnsyncBoxBody::new))
         .service(serve_dir);

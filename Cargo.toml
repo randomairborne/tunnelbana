@@ -9,6 +9,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "net", "fs"] }
 bytes = "1"
 
 # internal
+tunnelbana-etags = { workspace = true }
 tunnelbana-headers = { workspace = true }
 tunnelbana-redirects = { workspace = true }
 
@@ -29,9 +30,10 @@ vss = "0.1"
 thiserror = "2"
 
 [workspace]
-members = ["crates/tunnelbana-headers", "crates/tunnelbana-redirects"]
+members = ["crates/tunnelbana-etags", "crates/tunnelbana-headers", "crates/tunnelbana-redirects"]
 
 [workspace.dependencies]
+tunnelbana-etags = { path = "crates/tunnelbana-etags" }
 tunnelbana-headers = { path = "crates/tunnelbana-headers" }
 tunnelbana-redirects = { path = "crates/tunnelbana-redirects" }
 
