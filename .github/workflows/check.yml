@@ -17,9 +17,6 @@ jobs:
       - name: Cache Packages
         uses: Swatinem/rust-cache@v2
 
-      - name: Check formatting
-        run: cargo fmt --check
-
       - name: Check build
         run: cargo clippy
 
@@ -33,5 +30,5 @@ jobs:
           components: rustfmt
 
       - name: Check formatting
-        run: cargo fmt
+        run: cargo fmt --check
 
