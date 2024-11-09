@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "net", "fs"] }
 hyper-util = { version = "0.1", features = ["server", "server-graceful", "server-auto", "http1", "http2",  "service"] }
-tower-http = { version = "0.6", features = ["fs", "validate-request"] }
+tower-http = { version = "0.6", features = ["fs", "validate-request", "set-status"] }
 tunnelbana-tower = { workspace = true }
 tracing = "0.1"
 tower = { version = "0.5",  features = ["util"] }

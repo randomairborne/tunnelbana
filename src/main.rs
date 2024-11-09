@@ -19,6 +19,7 @@ use tokio::net::TcpListener;
 use tower::{ServiceBuilder, ServiceExt};
 use tower_http::{
     services::{ServeDir, ServeFile},
+    set_status::{SetStatus, SetStatusLayer},
     validate_request::ValidateRequestHeaderLayer,
 };
 use tunnelbana_tower::TunnelbanaLayer;
@@ -54,7 +55,9 @@ async fn main() {
         .precompressed_deflate()
         .precompressed_gzip()
         .precompressed_zstd();
-        //.map_response(set_not_found);
+    let not_found_svc = ServiceBuilder::new()
+        .layer(SetStatusLayer::new(StatusCode::NOT_FOUND))
+        .service(not_found_svc);
     let serve_dir = ServeDir::new(location)
         .append_index_html_on_directories(true)
         .precompressed_br()
@@ -148,11 +151,6 @@ fn read_with_default_if_nonexistent(path: impl AsRef<Path>) -> Result<String, Io
             _ => Err(e),
         },
     }
-}
-
-fn set_not_found<B>(mut resp: Response<B>) -> Response<B> {
-    *resp.status_mut() = StatusCode::NOT_FOUND;
-    resp
 }
 
 pub trait DisplayExpect<T> {
