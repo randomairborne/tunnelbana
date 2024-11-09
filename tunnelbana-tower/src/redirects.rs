@@ -15,7 +15,8 @@ pub fn parse(redirect_file: &str) -> Result<Vec<Redirect>, RedirectParseError> {
             continue;
         }
 
-        let items = line.split_ascii_whitespace().collect::<Vec<&str>>();
+        let items = line.split(' ').collect::<Vec<&str>>();
+        info!(line = idx + 1, ?items, "Items for line");
         if !(2..=3).contains(&items.len()) {
             return Err(RedirectParseError::new(
                 RedirectParseErrorKind::WrongOptCount(items.len()),

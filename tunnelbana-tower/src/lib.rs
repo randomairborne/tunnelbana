@@ -7,17 +7,21 @@ use std::{
 };
 
 use bytes::Bytes;
-use headers::HeaderParseError;
 use http::{header, HeaderName, HeaderValue, Request, Response, StatusCode};
-use http_body_util::combinators::UnsyncBoxBody;
+use http_body_util::{combinators::UnsyncBoxBody, BodyExt};
 use matchit::Router;
-use redirects::RedirectParseError;
 use tower::{Layer, Service};
 
 type BonusHeaders = Arc<[(HeaderName, HeaderValue)]>;
 
+#[macro_use]
+extern crate tracing;
+
 mod headers;
 mod redirects;
+
+pub use headers::{parse as headers, HeaderGroup, HeaderParseError, HeaderParseErrorKind};
+pub use redirects::{parse as redirects, Redirect, RedirectParseError, RedirectParseErrorKind};
 
 #[derive(Clone)]
 pub struct TunnelbanaLayer {
@@ -26,10 +30,7 @@ pub struct TunnelbanaLayer {
 }
 
 impl TunnelbanaLayer {
-    pub fn new(headers: &str, redirects: &str) -> Result<Self, Error> {
-        let header_list = headers::parse(redirects)?;
-        let redirect_list = redirects::parse(headers)?;
-
+    pub fn new(header_list: Vec<HeaderGroup>, redirect_list: Vec<Redirect>) -> Result<Self, Error> {
         let mut redirects = Router::new();
         for redirect in redirect_list {
             redirects.insert(redirect.path, (redirect.target, redirect.code))?;
@@ -39,6 +40,8 @@ impl TunnelbanaLayer {
         for header in header_list {
             headers.insert(header.path, header.targets.into())?;
         }
+
+        info!(?headers, ?redirects, "Build the subway");
 
         Ok(Self {
             redirects: Arc::new(redirects),
@@ -79,13 +82,12 @@ pub enum ResponseSource<F> {
     Redirect(HeaderValue, StatusCode),
 }
 
-impl<F, B, E> std::future::Future for ResponseFuture<F>
+impl<F, B, BE> std::future::Future for ResponseFuture<F>
 where
     F: Future<Output = Result<Response<B>, Infallible>>,
-    B: http_body::Body<Data = Bytes, Error = E> + Send + 'static,
-    E: Into<Box<dyn std::error::Error + Send + Sync>>
+    B: http_body::Body<Data = Bytes, Error = BE> + Send + 'static,
 {
-    type Output = Result<Response<UnsyncBoxBody<Bytes, E>>, Infallible>;
+    type Output = Result<Response<UnsyncBoxBody<Bytes, BE>>, Infallible>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let bonus_headers = self.additional_headers.clone();
@@ -99,16 +101,13 @@ where
     }
 }
 
-fn unsync_box_body_ify<B, E>(
-    res: Result<Response<B>, Infallible>,
-) -> Result<Response<UnsyncBoxBody<Bytes, E>>, Infallible>
+fn unsync_box_body_ify<B, E, BE>(
+    res: Result<Response<B>, E>,
+) -> Result<Response<UnsyncBoxBody<Bytes, BE>>, E>
 where
-    B: http_body::Body<Data = Bytes, Error = E> + Send + 'static,
-    E: Into<Box<dyn std::error::Error + Send + Sync>>
+    B: http_body::Body<Data = Bytes, Error = BE> + Send + 'static,
 {
-    let inner = res.unwrap(); // This is 100% fine. Infallible is unconstructable.
-    let (parts, body) = inner.into_parts();
-    Ok(Response::from_parts(parts, UnsyncBoxBody::new(body)))
+    res.map(|inner| inner.map(UnsyncBoxBody::new))
 }
 
 fn add_headers<B>(
@@ -125,26 +124,28 @@ fn add_headers<B>(
     Ok(inner)
 }
 
-fn redirect_respond(
+fn redirect_respond<E>(
     value: HeaderValue,
     code: StatusCode,
-) -> http::Response<UnsyncBoxBody<Bytes, Infallible>> {
-    let mut response = Response::new(UnsyncBoxBody::new(http_body_util::Empty::new()));
+) -> http::Response<UnsyncBoxBody<Bytes, E>> {
+    let mut response = Response::new(UnsyncBoxBody::new(
+        http_body_util::Empty::new().map_err(|never| match never {}),
+    ));
     response.headers_mut().insert(header::LOCATION, value);
     *response.status_mut() = code;
     response
 }
 
-impl<ReqBody, F, FResBody> Service<Request<ReqBody>> for Tunnelbana<F>
+impl<ReqBody, F, FResBody, FResBodyError> Service<Request<ReqBody>> for Tunnelbana<F>
 where
     F: Service<Request<ReqBody>, Response = Response<FResBody>, Error = Infallible> + Clone,
     F::Future: Send + 'static,
-    FResBody: http_body::Body<Data = Bytes> + Send + 'static,
-    FResBody::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
+    FResBody: http_body::Body<Data = Bytes, Error = FResBodyError> + Send + 'static,
+    FResBodyError: Into<Box<dyn std::error::Error + Send + Sync>>,
 {
     type Error = Infallible;
     type Future = ResponseFuture<F::Future>;
-    type Response = Response<UnsyncBoxBody<Bytes, FResBody::Error>>;
+    type Response = Response<UnsyncBoxBody<Bytes, FResBodyError>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
@@ -169,10 +170,6 @@ where
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("Header parse error: {0}")]
-    HeaderParse(#[from] HeaderParseError),
-    #[error("Redirect parse error: {0}")]
-    RedirectParse(#[from] RedirectParseError),
     #[error("Could not add route: {0}")]
     Insert(#[from] matchit::InsertError),
 }

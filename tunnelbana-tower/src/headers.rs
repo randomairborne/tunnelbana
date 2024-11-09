@@ -3,7 +3,7 @@ use http::{
     HeaderName, HeaderValue,
 };
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct HeaderGroup {
     pub path: String,
     pub targets: Vec<(HeaderName, HeaderValue)>,
@@ -56,6 +56,10 @@ pub fn parse(header_file: &str) -> Result<Vec<HeaderGroup>, HeaderParseError> {
             }
         }
     }
+    if let Some(ctx) = current_ctx {
+        headers.push(ctx);
+    }
+    info!(?headers, "Got headers");
     Ok(headers)
 }
 
