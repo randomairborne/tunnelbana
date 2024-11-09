@@ -1,85 +1,22 @@
 use std::{
-    collections::HashMap,
     convert::Infallible,
     future::Future,
-    path::{Path, PathBuf},
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
 };
 
 use bytes::Bytes;
-use http::{header::InvalidHeaderValue, HeaderValue, Request, Response, StatusCode};
+use http::{HeaderValue, Request, Response, StatusCode};
 use http_body_util::{combinators::UnsyncBoxBody, BodyExt};
+use tag_map::ResourceTagSet;
 use tower::{Layer, Service};
 
 #[macro_use]
 extern crate tracing;
 
-#[derive(Debug)]
-pub struct ETagMap {
-    map: HashMap<String, HeaderValue>,
-}
-
-impl ETagMap {
-    pub fn new(base_dir: &Path) -> Result<Self, Error> {
-        let files = get_file_list(base_dir)?;
-        trace!(?files, count = files.len(), "Hashing files");
-        let mut map = HashMap::new();
-        for path in files {
-            // This is basically just `b3sum` but rust
-            trace!(?path, "Hashing file");
-            let hash = blake3::Hasher::new().update_mmap_rayon(&path)?.finalize();
-            let relative_path = path
-                .strip_prefix(base_dir)?
-                .to_str()
-                .ok_or(Error::PathNotStr)?;
-            let key = format!("/{relative_path}");
-            let hash = hash.to_hex();
-            let value = HeaderValue::from_str(&format!("\"{hash}\""))?;
-            trace!(key, ?value, "Hashed file");
-            map.insert(key, value);
-        }
-        info!(count = map.len(), "Hashed files");
-        Ok(Self { map })
-    }
-}
-
-fn get_file_list(path: &Path) -> Result<Vec<PathBuf>, Error> {
-    trace!(?path, "Reading directory");
-    let dir = std::fs::read_dir(path)?;
-    let mut paths = Vec::new();
-    for file in dir {
-        let file = file?;
-        let kind = file.file_type()?;
-        let path = file.path();
-        if kind.is_dir() {
-            let mut dir = get_file_list(&path)?;
-            paths.append(&mut dir);
-        } else if kind.is_file() {
-            trace!(?path, "Found file");
-            paths.push(path);
-        } else {
-            return Err(Error::UnknownFileKind);
-        }
-    }
-    trace!(?paths, "Read directory");
-    Ok(paths)
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    #[error("I/O error: {0}")]
-    Io(#[from] std::io::Error),
-    #[error("Could not strip prefix: {0}")]
-    StripPrefix(#[from] std::path::StripPrefixError),
-    #[error("Hex header value was somehow invalid")]
-    InvalidHeaderValue(#[from] InvalidHeaderValue),
-    #[error("ETagMap does not follow symlinks or other strange files")]
-    UnknownFileKind,
-    #[error("Path was not a valid UTF-8 string")]
-    PathNotStr,
-}
+mod tag_map;
+pub use tag_map::{ETagMap, TagMapBuildError};
 
 #[derive(Clone)]
 pub struct ETagLayer {
@@ -114,7 +51,7 @@ pub struct ETag<S> {
 #[pin_project::pin_project(project = PinResponseOpts)]
 pub enum ResponseFuture<F> {
     NoETag(#[pin] F),
-    ChildRespWithETag(#[pin] F, HeaderValue),
+    ChildRespWithETag(#[pin] F, Arc<ResourceTagSet>),
     NotModified(HeaderValue),
 }
 
@@ -128,9 +65,9 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         match self.project() {
             PinResponseOpts::NoETag(f) => f.poll(cx).map(unsync_box_body_ify),
-            PinResponseOpts::ChildRespWithETag(f, etag) => f
+            PinResponseOpts::ChildRespWithETag(f, rtags) => f
                 .poll(cx)
-                .map(|v| add_etag(v, etag.clone()))
+                .map(|v| add_etag(v, rtags.clone()))
                 .map(unsync_box_body_ify),
             PinResponseOpts::NotModified(etag) => Poll::Ready(Ok(not_modified(etag.clone()))),
         }
@@ -140,9 +77,24 @@ where
 
 fn add_etag<B>(
     res: Result<Response<B>, Infallible>,
-    etag: HeaderValue,
+    etag: Arc<ResourceTagSet>,
 ) -> Result<Response<B>, Infallible> {
-    let mut inner = res.unwrap(); // This is 100% fine. Infallible is unconstructable.
+    let Ok(mut inner) = res;
+    let etag = if let Some(encoding) = inner.headers().get(http::header::CONTENT_ENCODING) {
+        let etag = match encoding.as_bytes() {
+            b"gzip" => etag.gzip.clone(),
+            b"deflate" => etag.deflate.clone(),
+            b"br" => etag.brotli.clone(),
+            b"zstd" => etag.zstd.clone(),
+            _ => return Ok(inner),
+        };
+        let Some(etag) = etag else {
+            return Ok(inner);
+        };
+        etag
+    } else {
+        etag.raw.clone()
+    };
     inner.headers_mut().insert(http::header::ETAG, etag);
     Ok(inner)
 }
@@ -150,7 +102,7 @@ fn add_etag<B>(
 fn remove_last_modified<B>(
     res: Result<Response<B>, Infallible>,
 ) -> Result<Response<B>, Infallible> {
-    let mut inner = res.unwrap(); // This is 100% fine. Infallible is unconstructable.
+    let Ok(mut inner) = res;
     inner.headers_mut().remove(http::header::LAST_MODIFIED);
     Ok(inner)
 }
@@ -195,10 +147,12 @@ where
         } else {
             path.to_string()
         };
-        if let Some(tag) = self.tags.map.get(&path) {
+        if let Some(tags) = self.tags.get(&path) {
             match req.headers().get(http::header::IF_NONE_MATCH) {
-                Some(matched) if matched == tag => ResponseFuture::NotModified(tag.clone()),
-                _ => ResponseFuture::ChildRespWithETag(self.inner.call(req), tag.clone()),
+                Some(matched) if tags.contains_tag(matched) => {
+                    ResponseFuture::NotModified(matched.clone())
+                }
+                _ => ResponseFuture::ChildRespWithETag(self.inner.call(req), tags.clone()),
             }
         } else {
             ResponseFuture::NoETag(self.inner.call(req))
