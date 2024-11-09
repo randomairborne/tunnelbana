@@ -1,3 +1,5 @@
+#![allow(unused)]
+
 use std::{
     io::{Error as IoError, ErrorKind as IoErrorKind},
     path::Path,
@@ -7,14 +9,14 @@ use std::{
 
 use bytes::Bytes;
 use http::{Request, Response, StatusCode};
-use http_body_util::{combinators::BoxBody, Empty};
+use http_body_util::{combinators::UnsyncBoxBody, BodyExt, Empty};
 use hyper_util::{
     rt::TokioExecutor,
     server::{conn::auto::Builder as ConnBuilder, graceful::GracefulShutdown},
     service::TowerToHyperService,
 };
 use tokio::net::TcpListener;
-use tower::ServiceBuilder;
+use tower::{ServiceBuilder, ServiceExt};
 use tower_http::{services::ServeDir, validate_request::ValidateRequestHeaderLayer};
 use tunnelbana_tower::TunnelbanaLayer;
 
@@ -42,14 +44,16 @@ async fn main() {
     let serve_dir = ServeDir::new(location);
 
     let hide_special_files = ValidateRequestHeaderLayer::custom(
-        |req: &mut Request<_>| -> Result<(), Response<BoxBody<Bytes, _>>> {
+        |req: &mut Request<_>| -> Result<(), Response<UnsyncBoxBody<Bytes, IoError>>> {
             for reserved_start in RESERVED_PATHS {
                 let path = req.uri().path();
                 if path.starts_with(reserved_start)
                     && !path.trim_start_matches(reserved_start).contains('/')
                 {
                     return {
-                        let mut resp = Response::new(BoxBody::new(Empty::new()));
+                        let mut resp = Response::new(UnsyncBoxBody::new(
+                            Empty::new().map_err(|never| match never {}),
+                        ));
                         *resp.status_mut() = StatusCode::NOT_FOUND;
                         Err(resp)
                     };
@@ -62,6 +66,7 @@ async fn main() {
     let service = ServiceBuilder::new()
         .layer(tunnelbanna)
         .layer(hide_special_files)
+        .map_response(|res: http::Response<_>| res.map(UnsyncBoxBody::new))
         .service(serve_dir);
 
     let listener = TcpListener::bind("0.0.0.0:8080")
@@ -73,6 +78,7 @@ async fn main() {
     let mut ctrl_c = pin!(vss::shutdown_signal());
 
     loop {
+        let service = service.clone();
         tokio::select! {
             conn = listener.accept() => {
                 match conn {
@@ -80,9 +86,8 @@ async fn main() {
                         info!("incoming connection accepted: {}", peer_addr);
                         let stream = hyper_util::rt::TokioIo::new(Box::pin(stream));
 
-                        let conn = server.serve_connection_with_upgrades(stream, TowerToHyperService::new(service));
-
-                        let conn = graceful.watch(conn.into_owned());
+                        let conn = server.serve_connection_with_upgrades(stream, TowerToHyperService::new(service)).into_owned();
+                        // let conn = graceful.watch(conn.into_owned());
 
                         tokio::spawn(async move {
                             if let Err(err) = conn.await {
