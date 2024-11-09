@@ -1,0 +1,25 @@
+[package]
+name = "tunnelbana"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "net", "fs"] }
+hyper-util = { version = "0.1", features = ["server", "http1", "http2", "server-graceful", "service"] }
+tower-http = { version = "0.6", features = ["fs", "validate-request"] }
+tunnelbana-tower = { workspace = true }
+tracing = "0.1"
+tower = "0.5"
+vss = "0.1"
+http = "1"
+http-body = "1"
+http-body-util = "0.1"
+bytes = "1"
+hyper = { version = "1.5.0", features = ["server", "http1", "http2"] }
+axum = "0.7"
+
+[workspace]
+members = ["tunnelbana-tower"]
+
+[workspace.dependencies]
+tunnelbana-tower = { path = "tunnelbana-tower" }
