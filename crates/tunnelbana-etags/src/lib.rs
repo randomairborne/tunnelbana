@@ -133,7 +133,8 @@ where
                 .map(|v| add_etag(v, etag.clone()))
                 .map(unsync_box_body_ify),
             PinResponseOpts::NotModified(etag) => Poll::Ready(Ok(not_modified(etag.clone()))),
-        }.map(remove_last_modified)
+        }
+        .map(remove_last_modified)
     }
 }
 
