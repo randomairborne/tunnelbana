@@ -144,7 +144,7 @@ where
 {
     type Error = Infallible;
     type Future = ResponseFuture<F::Future>;
-    type Response = Response<UnsyncBoxBody<Bytes, Infallible>>;
+    type Response = Response<UnsyncBoxBody<Bytes, FResBody::Error>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.inner.poll_ready(cx)
