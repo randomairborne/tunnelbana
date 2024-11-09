@@ -34,7 +34,7 @@ async fn main() {
     tracing_subscriber::fmt().init();
     let arg1 = std::env::args_os()
         .nth(1)
-        .expect("Expected exactly 1 argument");
+        .display_expect("Expected exactly 1 argument");
     let location = Path::new(&arg1);
     if !location.is_dir() {
         panic!("Expected argument 1 to be a directory");
@@ -42,14 +42,14 @@ async fn main() {
     let location = location.canonicalize().unwrap();
 
     let headers = read_with_default_if_nonexistent(location.join("_headers"))
-        .expect("Failed to read _headers");
-    let headers = tunnelbana_tower::headers(&headers).expect("Failed to parse _headers");
+        .display_expect("Failed to read _headers");
+    let headers = tunnelbana_tower::headers(&headers).display_expect("Failed to parse _headers");
 
     let redirects = read_with_default_if_nonexistent(location.join("_redirects"))
-        .expect("Failed to read _redirects");
-    let redirects = tunnelbana_tower::redirects(&redirects).expect("Failed to parse _redirects");
+        .display_expect("Failed to read _redirects");
+    let redirects = tunnelbana_tower::redirects(&redirects).display_expect("Failed to parse _redirects");
 
-    let tunnelbanna = TunnelbanaLayer::new(headers, redirects).expect("Failed to build routers");
+    let tunnelbanna = TunnelbanaLayer::new(headers, redirects).display_expect("Failed to build routers");
     let not_found_svc = ServeFile::new(location.join("404.html"))
         .precompressed_br()
         .precompressed_deflate()
@@ -94,7 +94,7 @@ async fn main() {
 
     let listener = TcpListener::bind("0.0.0.0:8080")
         .await
-        .expect("Failed to bind to port 8080");
+        .display_expect("Failed to bind to port 8080");
 
     let server = ConnBuilder::new(TokioExecutor::new());
     let graceful = GracefulShutdown::new();
@@ -154,14 +154,24 @@ fn read_with_default_if_nonexistent(path: impl AsRef<Path>) -> Result<String, Io
 }
 
 pub trait DisplayExpect<T> {
-    fn display_expect(self) -> T;
+    fn display_expect(self, message: &str) -> T;
 }
 
 impl<T, E: std::fmt::Display> DisplayExpect<T> for Result<T, E> {
-    fn display_expect(self) -> T {
+    fn display_expect(self, msg: &str) -> T {
         match self {
             Ok(v) => v,
-            Err(e) => panic!("{e}"),
+            Err(e) => panic!("{msg}: {e}"),
+        }
+    }
+}
+
+impl<T> DisplayExpect<T> for Option<T> {
+    fn display_expect(self, msg: &str) -> T {
+        if let Some(v) = self {
+            v
+        } else {
+            panic!("{msg}");
         }
     }
 }
