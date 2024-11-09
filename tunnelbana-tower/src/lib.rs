@@ -79,12 +79,13 @@ pub enum ResponseSource<F> {
     Redirect(HeaderValue, StatusCode),
 }
 
-impl<F, B> std::future::Future for ResponseFuture<F>
+impl<F, B, E> std::future::Future for ResponseFuture<F>
 where
     F: Future<Output = Result<Response<B>, Infallible>>,
-    B: http_body::Body<Data = Bytes, Error = Infallible> + Send + 'static,
+    B: http_body::Body<Data = Bytes, Error = E> + Send + 'static,
+    E: Into<Box<dyn std::error::Error + Send + Sync>>
 {
-    type Output = Result<Response<UnsyncBoxBody<Bytes, Infallible>>, Infallible>;
+    type Output = Result<Response<UnsyncBoxBody<Bytes, E>>, Infallible>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let bonus_headers = self.additional_headers.clone();
@@ -98,11 +99,12 @@ where
     }
 }
 
-fn unsync_box_body_ify<B>(
+fn unsync_box_body_ify<B, E>(
     res: Result<Response<B>, Infallible>,
-) -> Result<Response<UnsyncBoxBody<Bytes, Infallible>>, Infallible>
+) -> Result<Response<UnsyncBoxBody<Bytes, E>>, Infallible>
 where
-    B: http_body::Body<Data = Bytes, Error = Infallible> + Send + 'static,
+    B: http_body::Body<Data = Bytes, Error = E> + Send + 'static,
+    E: Into<Box<dyn std::error::Error + Send + Sync>>
 {
     let inner = res.unwrap(); // This is 100% fine. Infallible is unconstructable.
     let (parts, body) = inner.into_parts();
@@ -137,7 +139,7 @@ impl<ReqBody, F, FResBody> Service<Request<ReqBody>> for Tunnelbana<F>
 where
     F: Service<Request<ReqBody>, Response = Response<FResBody>, Error = Infallible> + Clone,
     F::Future: Send + 'static,
-    FResBody: http_body::Body<Data = Bytes, Error = Infallible> + Send + 'static,
+    FResBody: http_body::Body<Data = Bytes> + Send + 'static,
     FResBody::Error: Into<Box<dyn std::error::Error + Send + Sync>>,
 {
     type Error = Infallible;
