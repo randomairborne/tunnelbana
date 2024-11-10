@@ -9,6 +9,7 @@ use std::{
 use http::HeaderValue;
 
 #[derive(Debug)]
+#[allow(clippy::module_name_repetitions)]
 pub struct ETagMap {
     map: HashMap<String, Arc<ResourceTagSet>>,
 }
@@ -77,6 +78,11 @@ impl ResourceTags {
 }
 
 impl ETagMap {
+    /// Create a new [`ETagMap`] for all the files in this directory.
+    /// `.gz`, `.zz`, `.zst`, and `.br` files will be automatically incorporated
+    /// into their parents.
+    /// # Errors
+    /// This function can error if mmap fails in b3, or if paths cannot be generated
     pub fn new(base_dir: &Path) -> Result<Self, TagMapBuildError> {
         let files = get_file_list(base_dir)?;
         trace!(?files, count = files.len(), "Hashing files");
@@ -152,6 +158,7 @@ fn get_file_list(path: &Path) -> Result<Vec<PathBuf>, TagMapBuildError> {
 }
 
 #[derive(Debug, thiserror::Error)]
+#[allow(clippy::module_name_repetitions)]
 pub enum TagMapBuildError {
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),

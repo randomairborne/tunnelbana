@@ -1,3 +1,4 @@
+#![warn(clippy::all, clippy::pedantic, clippy::nursery)]
 use std::{
     convert::Infallible,
     future::Future,
@@ -24,6 +25,7 @@ pub struct ETagLayer {
 }
 
 impl ETagLayer {
+    #[must_use]
     pub fn new(tags: ETagMap) -> Self {
         Self {
             tags: Arc::new(tags),
@@ -67,7 +69,7 @@ where
             PinResponseOpts::NoETag(f) => f.poll(cx).map(unsync_box_body_ify),
             PinResponseOpts::ChildRespWithETag(f, rtags) => f
                 .poll(cx)
-                .map(|v| add_etag(v, rtags.clone()))
+                .map(|v| add_etag(v, rtags))
                 .map(unsync_box_body_ify),
             PinResponseOpts::NotModified(etag) => Poll::Ready(Ok(not_modified(etag.clone()))),
         }
@@ -75,9 +77,10 @@ where
     }
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn add_etag<B>(
     res: Result<Response<B>, Infallible>,
-    etag: Arc<ResourceTagSet>,
+    etag: &ResourceTagSet,
 ) -> Result<Response<B>, Infallible> {
     let Ok(mut inner) = res;
     let etag = if let Some(encoding) = inner.headers().get(http::header::CONTENT_ENCODING) {
@@ -99,6 +102,7 @@ fn add_etag<B>(
     Ok(inner)
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn remove_last_modified<B>(
     res: Result<Response<B>, Infallible>,
 ) -> Result<Response<B>, Infallible> {
