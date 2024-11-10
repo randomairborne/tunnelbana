@@ -45,7 +45,7 @@ pub fn parse(redirect_file: &str) -> Result<Vec<Redirect>, RedirectParseError> {
         }
 
         let path = items[0].to_string();
-        let Ok(target) = HeaderValue::from_str(items[1]) else {
+        let Ok(target) = HeaderValue::from_str(items[1].trim()) else {
             return Err(RedirectParseError::new(
                 RedirectParseErrorKind::HeaderValue(items[1].to_string()),
                 idx,

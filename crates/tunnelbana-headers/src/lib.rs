@@ -46,7 +46,7 @@ pub fn parse(header_file: &str) -> Result<Vec<HeaderGroup>, HeaderParseError> {
                 .trim()
                 .split_once(':')
                 .ok_or_else(|| HeaderParseError::new(HeaderParseErrorKind::NoHeaderColon, idx))?;
-            let name = match HeaderName::from_bytes(name.as_bytes()) {
+            let name = match HeaderName::from_bytes(name.trim().as_bytes()) {
                 Ok(v) => v,
                 Err(e) => {
                     return Err(HeaderParseError::new(
@@ -55,7 +55,7 @@ pub fn parse(header_file: &str) -> Result<Vec<HeaderGroup>, HeaderParseError> {
                     ))
                 }
             };
-            let value = match HeaderValue::from_bytes(value.as_bytes()) {
+            let value = match HeaderValue::from_bytes(value.trim().as_bytes()) {
                 Ok(v) => v,
                 Err(e) => {
                     return Err(HeaderParseError::new(
