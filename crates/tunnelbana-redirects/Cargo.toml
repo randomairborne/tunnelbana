@@ -18,3 +18,4 @@ thiserror = "2"
 
 # router
 matchit = "0.8"
+simpleinterpolation = "0.2"

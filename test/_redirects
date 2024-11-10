@@ -1,1 +1,2 @@
 /google https://google.com 302
+/gh/{repo} https://github.com/randomairborne/{repo} 302

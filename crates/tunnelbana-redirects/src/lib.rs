@@ -1,5 +1,7 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
 use std::{
+    borrow::Cow,
+    collections::HashMap,
     convert::Infallible,
     future::Future,
     pin::Pin,
@@ -11,6 +13,7 @@ use bytes::Bytes;
 use http::{header, HeaderValue, Request, Response, StatusCode};
 use http_body_util::{combinators::UnsyncBoxBody, BodyExt};
 use matchit::Router;
+use simpleinterpolation::{Interpolation, RenderError};
 use tower::{Layer, Service};
 
 #[macro_use]
@@ -19,7 +22,7 @@ extern crate tracing;
 #[derive(Clone)]
 pub struct Redirect {
     pub path: String,
-    pub target: HeaderValue,
+    pub target: Interpolation,
     pub code: StatusCode,
 }
 
@@ -45,12 +48,10 @@ pub fn parse(redirect_file: &str) -> Result<Vec<Redirect>, RedirectParseError> {
         }
 
         let path = items[0].to_string();
-        let Ok(target) = HeaderValue::from_str(items[1].trim()) else {
-            return Err(RedirectParseError::new(
-                RedirectParseErrorKind::HeaderValue(items[1].to_string()),
-                idx,
-            ));
-        };
+        let target = Interpolation::new(items[1])
+            .map_err(|e| RedirectParseError::new(RedirectParseErrorKind::Interpolation(e), idx))?;
+
+        test_interpolation(&path, &target, idx)?;
 
         let code: StatusCode = if let Some(code_str) = items.get(2) {
             let Ok(code) = code_str.parse() else {
@@ -66,6 +67,49 @@ pub fn parse(redirect_file: &str) -> Result<Vec<Redirect>, RedirectParseError> {
         redirects.push(Redirect { path, target, code });
     }
     Ok(redirects)
+}
+
+fn test_interpolation(
+    path: &str,
+    target: &Interpolation,
+    idx: usize,
+) -> Result<(), RedirectParseError> {
+    // Show a valid matchit route
+    let mut router = matchit::Router::new();
+    router
+        .insert(path, ())
+        .map_err(|e| RedirectParseError::new(RedirectParseErrorKind::Matchit(e), idx))?;
+
+    // params returns (key, value)
+    let params: HashMap<Cow<str>, Cow<str>> = router
+        .at(path)
+        .map_err(|_| {
+            RedirectParseError::new(RedirectParseErrorKind::NonSelfMatchingTriggerPath, idx)
+        })?
+        .params
+        .iter()
+        .map(cowify)
+        .collect();
+
+    // prove that this value can actually be rendered
+    let render = target.try_render(&params).map_err(|e| {
+        let RenderError::UnknownVariables(e) = e;
+        RedirectParseError::new(
+            RedirectParseErrorKind::InterpKeys(e.into_iter().map(ToOwned::to_owned).collect()),
+            idx,
+        )
+    })?;
+
+    // Prove that the rendered value is a valid header
+    HeaderValue::from_bytes(render.as_bytes())
+        .map_err(|_| RedirectParseError::new(RedirectParseErrorKind::HeaderValue(render), idx))?;
+
+    Ok(())
+}
+
+#[inline]
+const fn cowify<'a>(v: (&'a str, &'a str)) -> (Cow<'a, str>, Cow<'a, str>) {
+    (Cow::Borrowed(v.0), Cow::Borrowed(v.1))
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -90,11 +134,19 @@ pub enum RedirectParseErrorKind {
     HeaderValue(String),
     #[error("`{0}` could not be converted to a status")]
     StatusCode(String),
+    #[error("{0}")]
+    Interpolation(simpleinterpolation::ParseError),
+    #[error("Not all keys found, missing {0:?}")]
+    InterpKeys(Vec<String>),
+    #[error("Invalid trigger path: {0}")]
+    Matchit(matchit::InsertError),
+    #[error("This path doesn't match itself, this is a bug")]
+    NonSelfMatchingTriggerPath,
 }
 
 #[derive(Clone)]
 pub struct RedirectsLayer {
-    redirects: Arc<matchit::Router<(HeaderValue, StatusCode)>>,
+    redirects: Arc<matchit::Router<(Interpolation, StatusCode)>>,
 }
 
 impl RedirectsLayer {
@@ -128,7 +180,7 @@ impl<S> Layer<S> for RedirectsLayer {
 
 #[derive(Clone)]
 pub struct Redirects<S> {
-    redirects: Arc<matchit::Router<(HeaderValue, StatusCode)>>,
+    redirects: Arc<matchit::Router<(Interpolation, StatusCode)>>,
     inner: S,
 }
 
@@ -136,6 +188,7 @@ pub struct Redirects<S> {
 pub enum ResponseFuture<F> {
     Child(#[pin] F),
     Redirect(HeaderValue, StatusCode),
+    InvalidHeaderValue,
 }
 
 impl<F, B, BE> std::future::Future for ResponseFuture<F>
@@ -148,9 +201,10 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         match self.project() {
             PinResponseSource::Redirect(header_value, status) => {
-                Poll::Ready(Ok(redirect_respond(header_value.clone(), *status)))
+                Poll::Ready(Ok(redirect_respond(header_value, *status)))
             }
             PinResponseSource::Child(f) => f.poll(cx).map(unsync_box_body_ify),
+            PinResponseSource::InvalidHeaderValue => Poll::Ready(Ok(invalid_header_respond())),
         }
     }
 }
@@ -165,14 +219,24 @@ where
 }
 
 fn redirect_respond<E>(
-    value: HeaderValue,
+    value: &HeaderValue,
     code: StatusCode,
 ) -> http::Response<UnsyncBoxBody<Bytes, E>> {
     let mut response = Response::new(UnsyncBoxBody::new(
         http_body_util::Empty::new().map_err(|never| match never {}),
     ));
-    response.headers_mut().insert(header::LOCATION, value);
+    response
+        .headers_mut()
+        .insert(header::LOCATION, value.clone());
     *response.status_mut() = code;
+    response
+}
+
+fn invalid_header_respond<E>() -> http::Response<UnsyncBoxBody<Bytes, E>> {
+    let mut response = Response::new(UnsyncBoxBody::new(
+        http_body_util::Empty::new().map_err(|never| match never {}),
+    ));
+    *response.status_mut() = StatusCode::INTERNAL_SERVER_ERROR;
     response
 }
 
@@ -194,7 +258,13 @@ where
     fn call(&mut self, req: http::Request<ReqBody>) -> Self::Future {
         let path = req.uri().path();
         if let Ok(location) = self.redirects.at(path) {
-            ResponseFuture::Redirect(location.value.0.clone(), location.value.1)
+            let args: HashMap<Cow<str>, Cow<str>> = location.params.iter().map(cowify).collect();
+            let src = location.value.0.render(&args);
+            if let Ok(value) = HeaderValue::from_str(&src) {
+                ResponseFuture::Redirect(value, location.value.1)
+            } else {
+                ResponseFuture::InvalidHeaderValue
+            }
         } else {
             ResponseFuture::Child(self.inner.call(req))
         }
