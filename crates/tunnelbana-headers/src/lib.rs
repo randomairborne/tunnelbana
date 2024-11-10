@@ -1,3 +1,4 @@
+#![warn(clippy::all, clippy::pedantic, clippy::nursery)]
 use std::{
     convert::Infallible,
     future::Future,
@@ -25,6 +26,10 @@ pub struct HeaderGroup {
     pub targets: Vec<(HeaderName, HeaderValue)>,
 }
 
+/// Parse a list of [`HeaderGroup`]s from a cloudflare-style _headers string.
+/// # Errors
+/// This function errors if you have an orphaned header definition, if you have an invalid header name or value,
+/// or if your name cannot be a matchit path.
 pub fn parse(header_file: &str) -> Result<Vec<HeaderGroup>, HeaderParseError> {
     let mut headers = Vec::new();
     let mut current_ctx: Option<HeaderGroup> = None;
@@ -88,7 +93,7 @@ pub struct HeaderParseError {
 }
 
 impl HeaderParseError {
-    fn new(kind: HeaderParseErrorKind, idx: usize) -> Self {
+    const fn new(kind: HeaderParseErrorKind, idx: usize) -> Self {
         Self { row: idx + 1, kind }
     }
 }
@@ -111,6 +116,11 @@ pub struct HeadersLayer {
 }
 
 impl HeadersLayer {
+    /// Create a new [`HeadersLayer`]. The header groups are naively added
+    /// to a matchit router internally.
+    /// # Errors
+    /// If two [`HeaderGroup`]s are the same, or would illgally overlap
+    /// an error can be returned
     pub fn new(header_list: Vec<HeaderGroup>) -> Result<Self, Error> {
         let mut headers = Router::new();
         for header in header_list {
@@ -165,6 +175,7 @@ where
     }
 }
 
+#[allow(clippy::unnecessary_wraps)]
 fn add_headers<B>(
     res: Result<Response<B>, Infallible>,
     bonus_headers: Option<BonusHeaders>,
