@@ -1,5 +1,5 @@
-#![allow(unused)]
-
+#![warn(clippy::all, clippy::pedantic, clippy::nursery)]
+#![allow(clippy::redundant_pub_crate)] // tokio::select!
 use std::{
     io::{Error as IoError, ErrorKind as IoErrorKind},
     path::Path,
@@ -16,10 +16,10 @@ use hyper_util::{
     service::TowerToHyperService,
 };
 use tokio::net::TcpListener;
-use tower::{ServiceBuilder, ServiceExt};
+use tower::ServiceBuilder;
 use tower_http::{
     services::{ServeDir, ServeFile},
-    set_status::{SetStatus, SetStatusLayer},
+    set_status::SetStatusLayer,
     validate_request::ValidateRequestHeaderLayer,
 };
 use tracing::Level;
@@ -40,14 +40,12 @@ const LOG_LEVEL: Level = Level::INFO;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    tracing_subscriber::fmt().with_max_level(Level::INFO).init();
+    tracing_subscriber::fmt().with_max_level(LOG_LEVEL).init();
     let arg1 = std::env::args_os()
         .nth(1)
         .display_expect("Expected exactly 1 argument");
     let location = Path::new(&arg1);
-    if !location.is_dir() {
-        panic!("Expected argument 1 to be a directory");
-    }
+    assert!(location.is_dir(), "Expected argument 1 to be a directory");
     let location = location.canonicalize().unwrap();
 
     let headers = read_with_default_if_nonexistent(location.join("_headers"))
@@ -83,25 +81,7 @@ async fn main() {
         .precompressed_zstd()
         .fallback(not_found_svc);
 
-    let hide_special_files = ValidateRequestHeaderLayer::custom(
-        |req: &mut Request<_>| -> Result<(), Response<UnsyncBoxBody<Bytes, IoError>>> {
-            for reserved_start in RESERVED_PATHS {
-                let path = req.uri().path();
-                if path.starts_with(reserved_start)
-                    && !path.trim_start_matches(reserved_start).contains('/')
-                {
-                    return {
-                        let mut resp = Response::new(UnsyncBoxBody::new(
-                            Empty::new().map_err(|never| match never {}),
-                        ));
-                        *resp.status_mut() = StatusCode::NOT_FOUND;
-                        Err(resp)
-                    };
-                }
-            }
-            Ok(())
-        },
-    );
+    let hide_special_files = ValidateRequestHeaderLayer::custom(hide_special_files);
 
     let service = ServiceBuilder::new()
         .layer(header_add_mw)
@@ -144,7 +124,7 @@ async fn main() {
                     }
                 };
             },
-            _ = ctrl_c.as_mut() => {
+            () = ctrl_c.as_mut() => {
                 drop(listener);
                 info!("Ctrl-C received, starting shutdown");
                 break;
@@ -153,13 +133,33 @@ async fn main() {
     }
 
     tokio::select! {
-        _ = graceful.shutdown() => {
+        () = graceful.shutdown() => {
             info!("Gracefully shutdown!");
         },
-        _ = tokio::time::sleep(Duration::from_secs(10)) => {
+        () = tokio::time::sleep(Duration::from_secs(10)) => {
             error!("Waited 10 seconds for graceful shutdown, aborting...");
         }
     }
+}
+
+fn hide_special_files<T>(
+    req: &mut Request<T>,
+) -> Result<(), Response<UnsyncBoxBody<Bytes, IoError>>> {
+    for reserved_start in RESERVED_PATHS {
+        let path = req.uri().path();
+        if path.starts_with(reserved_start)
+            && !path.trim_start_matches(reserved_start).contains('/')
+        {
+            return {
+                let mut resp = Response::new(UnsyncBoxBody::new(
+                    Empty::new().map_err(|never| match never {}),
+                ));
+                *resp.status_mut() = StatusCode::NOT_FOUND;
+                Err(resp)
+            };
+        }
+    }
+    Ok(())
 }
 
 fn read_with_default_if_nonexistent(path: impl AsRef<Path>) -> Result<String, IoError> {
@@ -187,10 +187,11 @@ impl<T, E: std::fmt::Display> DisplayExpect<T> for Result<T, E> {
 
 impl<T> DisplayExpect<T> for Option<T> {
     fn display_expect(self, msg: &str) -> T {
-        if let Some(v) = self {
-            v
-        } else {
-            panic!("{msg}");
-        }
+        self.map_or_else(
+            || {
+                panic!("{msg}");
+            },
+            |v| v,
+        )
     }
 }
