@@ -1,3 +1,4 @@
+#![warn(clippy::all, clippy::pedantic, clippy::nursery)]
 use std::{
     convert::Infallible,
     future::Future,
@@ -22,6 +23,10 @@ pub struct Redirect {
     pub code: StatusCode,
 }
 
+/// Parse a list of [`Redirect`]s from a cloudflare-style _redirects string.
+/// # Errors
+/// This function errors if your status code is malformed, your target cannot be a header value,
+/// or if your name cannot be a matchit path.
 pub fn parse(redirect_file: &str) -> Result<Vec<Redirect>, RedirectParseError> {
     let mut redirects = Vec::new();
     for (idx, line) in redirect_file.lines().enumerate() {
@@ -50,7 +55,7 @@ pub fn parse(redirect_file: &str) -> Result<Vec<Redirect>, RedirectParseError> {
         let code: StatusCode = if let Some(code_str) = items.get(2) {
             let Ok(code) = code_str.parse() else {
                 return Err(RedirectParseError::new(
-                    RedirectParseErrorKind::StatusCode(code_str.to_string()),
+                    RedirectParseErrorKind::StatusCode((*code_str).to_string()),
                     idx,
                 ));
             };
@@ -72,7 +77,7 @@ pub struct RedirectParseError {
 }
 
 impl RedirectParseError {
-    fn new(kind: RedirectParseErrorKind, idx: usize) -> Self {
+    const fn new(kind: RedirectParseErrorKind, idx: usize) -> Self {
         Self { row: idx + 1, kind }
     }
 }
@@ -93,6 +98,9 @@ pub struct RedirectsLayer {
 }
 
 impl RedirectsLayer {
+    /// Create a new [`RedirectsLayer`] from a list of [`Redirect`]s.
+    /// # Errors
+    /// This function can error if you have two redirects for the same path.
     pub fn new(redirect_list: Vec<Redirect>) -> Result<Self, Error> {
         let mut redirects = Router::new();
         for redirect in redirect_list {
