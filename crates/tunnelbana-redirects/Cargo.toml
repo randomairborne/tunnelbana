@@ -2,6 +2,13 @@
 name = "tunnelbana-redirects"
 version = "0.1.0"
 edition = "2021"
+authors = ["valkyrie_pilot <valk@randomairborne.dev>"]
+description = "Generate redirect lists from cloudflare-style _redirects text files and serve them with tower."
+keywords = ["redirects", "http", "tower"]
+categories = ["web-programming"]
+repository = "https://github.com/randomairborne/tunnelbana"
+readme = "README.txt"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 # http
