@@ -10,7 +10,7 @@ use http::HeaderValue;
 
 #[derive(Debug)]
 #[allow(clippy::module_name_repetitions)]
-/// A map of String-based static paths to [`ResourceTagSet`]s.
+/// A map of String-based static paths to etag sets.
 /// This serves as a simple wrapper type, just to prove that the created
 /// map is valid.
 pub struct ETagMap {

@@ -32,3 +32,14 @@ jobs:
       - name: Check formatting
         run: cargo fmt --check
 
+  check-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@nightly
+
+      - name: Check formatting
+        run: cargo doc --workspace
+        env:
+          RUSTFLAGS: "-D warnings"

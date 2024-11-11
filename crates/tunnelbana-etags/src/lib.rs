@@ -1,13 +1,13 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
 //! # tunnelbana-etags
 //! An [`ETag`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/ETag) adding middleware
-//! for Rust and especially [`ServeDir`](tower_http::services::fs::ServeDir)
+//! for Rust and especially [`ServeDir`](https://docs.rs/tower-http/0.6.1/tower_http/services/struct.ServeDir.html)
 //! Part of the [tunnelbana](https://github.com/randomairborne/tunnelbana) project.
 //!
 //! # Example
 //! ```rust,no_run
 //! use http_body_util::combinators::UnsyncBoxBody;
-//! use tower_http::services::fs::ServeDir;
+//! use tower_http::services::ServeDir;
 //! use tower::{ServiceBuilder, ServiceExt};
 //! use http::Response;
 //! use tunnelbana_etags::{ETagLayer, ETagMap};
@@ -80,12 +80,12 @@ pub enum ResponseFuture<F> {
     /// No etag has been found. Request & response will be
     /// forwarded trainsparently.
     NoETag(#[pin] F),
-    /// A [`ResourceTagSet`] has been found at this path.
+    /// An etag set has been found at this path.
     /// Its etag will be added to the response based on
     /// compression.
     ChildRespWithETag(#[pin] F, Arc<ResourceTagSet>),
     /// An `If-None-Match` header was sent which matched
-    /// a value within the [`ResourceTagSet`]. A response
+    /// a value within the etag set. A response
     /// will be returned directly.
     NotModified(HeaderValue),
 }
