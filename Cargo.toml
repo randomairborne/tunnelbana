@@ -1,9 +1,9 @@
 [package]
 name = "tunnelbana"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["valkyrie_pilot <valk@randomairborne.dev>"]
-description = "Generate redirect lists from cloudflare-style _redirects text files and serve them with tower."
+description = "Serve static websites with ease and speed."
 keywords = ["redirects", "http", "tower"]
 categories = ["web-programming", "web-programming::http-server"]
 repository = "https://github.com/randomairborne/tunnelbana"
