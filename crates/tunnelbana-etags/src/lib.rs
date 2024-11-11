@@ -1,6 +1,7 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
 //! # tunnelbana-etags
-//! An ETag adding middleware for Rust and [`ServeDir`](tower_http::services::fs::ServeDir)
+//! An [`ETag`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/ETag) adding middleware
+//! for Rust and especially [`ServeDir`](tower_http::services::fs::ServeDir)
 //! Part of the [tunnelbana](https://github.com/randomairborne/tunnelbana) project.
 //!
 //! # Example
