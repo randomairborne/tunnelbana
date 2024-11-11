@@ -76,10 +76,11 @@ async fn main() {
         .precompressed_deflate()
         .precompressed_gzip()
         .precompressed_zstd()
-        .fallback(not_found_svc);
+        .fallback(not_found_svc.clone());
 
-    let hide_special_files = tunnelbana_hidepaths::HidePathLayer::builder()
+    let hide_special_files = tunnelbana_hidepaths::HidePathsLayer::builder()
         .hide_all(RESERVED_PATHS)
+        .with_not_found_service(not_found_svc)
         .build()
         .expect("Failed to build path hide layer");
 

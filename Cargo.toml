@@ -8,10 +8,10 @@ edition = "2021"
 tokio = { version = "1", features = ["rt-multi-thread", "net", "fs"] }
 
 # internal
-tunnelbana-etags.workspace = true
-tunnelbana-headers.workspace = true
-tunnelbana-redirects.workspace = true
-tunnelbana-hidepaths.workspace = true
+tunnelbana-etags = "0.1"
+tunnelbana-headers = "0.1"
+tunnelbana-redirects = "0.1"
+tunnelbana-hidepaths = "0.1"
 
 # http
 tower = { version = "0.5",  features = ["util"] }
