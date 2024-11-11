@@ -1,4 +1,33 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
+//! # tunnelbana-headers
+//! A tower middleware to add headers to specific routes, or route groups.
+//! 
+//! Part of the [tunnelbana](https://github.com/randomairborne/tunnelbana) project.
+//!
+//! # Example
+//! ```rust
+//! use tower_http::services::ServeDir;
+//! use tower::{ServiceBuilder, ServiceExt};
+//! use http::Response;
+//! use tunnelbana_headers::HeadersLayer;
+//!
+//! let config = r#"
+//!/example
+//!  X-Example-Header: example.org
+//!/subpath/{other}
+//!  X-Header-One: h1
+//!  X-Header-Two: h2
+//!/wildcard/{*wildcard}
+//!  X-Header-A: ha
+//!  X-Header-B: hb
+//!"#;
+//! let headers = tunnelbana_headers::parse(config).expect("Failed to parse headers");
+//! let headers_mw = HeadersLayer::new(headers).expect("Failed to route headers");
+//! let serve_dir = ServeDir::new("/var/www/html").append_index_html_on_directories(true);
+//! let service = ServiceBuilder::new()
+//!    .layer(headers_mw)
+//!    .service(serve_dir);
+//! ```
 use std::{
     convert::Infallible,
     future::Future,
@@ -13,6 +42,7 @@ use http::{
     HeaderName, HeaderValue, Request, Response,
 };
 use matchit::Router;
+pub use matchit::InsertError;
 use tower::{Layer, Service};
 
 type BonusHeaders = Arc<[(HeaderName, HeaderValue)]>;
@@ -34,7 +64,7 @@ pub fn parse(header_file: &str) -> Result<Vec<HeaderGroup>, HeaderParseError> {
     let mut headers = Vec::new();
     let mut current_ctx: Option<HeaderGroup> = None;
     for (idx, line) in header_file.lines().enumerate() {
-        if line.is_empty() || line.starts_with('#') {
+        if line.is_empty() || line.trim().starts_with('#') {
             // handle comments
             continue;
         }
@@ -86,6 +116,7 @@ pub fn parse(header_file: &str) -> Result<Vec<HeaderGroup>, HeaderParseError> {
 
 #[derive(Debug, thiserror::Error)]
 #[error("at line {row}: {kind}")]
+/// Describes the location and type of a header parsing problem.
 pub struct HeaderParseError {
     row: usize,
     #[source]
@@ -99,6 +130,8 @@ impl HeaderParseError {
 }
 
 #[derive(Debug, thiserror::Error)]
+/// Types of header parsing errors. These can come from the [`http`]
+/// crate, or internally from `tunnelbana-headers`.
 pub enum HeaderParseErrorKind {
     #[error("Header name invalid: {0}")]
     HeaderNameParse(#[from] InvalidHeaderName),
@@ -111,6 +144,7 @@ pub enum HeaderParseErrorKind {
 }
 
 #[derive(Clone)]
+/// a [`tower::Layer`] to add to a [`tower::ServiceBuilder`] to add headers.
 pub struct HeadersLayer {
     headers: Arc<matchit::Router<BonusHeaders>>,
 }
@@ -121,7 +155,7 @@ impl HeadersLayer {
     /// # Errors
     /// If two [`HeaderGroup`]s are the same, or would illgally overlap
     /// an error can be returned
-    pub fn new(header_list: Vec<HeaderGroup>) -> Result<Self, Error> {
+    pub fn new(header_list: Vec<HeaderGroup>) -> Result<Self, InsertError> {
         let mut headers = Router::new();
         for header in header_list {
             headers.insert(header.path, header.targets.into())?;
@@ -147,12 +181,14 @@ impl<S> Layer<S> for HeadersLayer {
 }
 
 #[derive(Clone)]
+/// a [`tower::Service`] which adds headers to a wrapped S.
 pub struct Headers<S> {
     headers: Arc<matchit::Router<BonusHeaders>>,
     inner: S,
 }
 
 #[pin_project::pin_project]
+/// Custom future which adds headers unconditionally to a response.
 pub struct ResponseFuture<F> {
     #[pin]
     src: F,
@@ -213,10 +249,4 @@ where
             additional_headers,
         }
     }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    #[error("Could not add route: {0}")]
-    Insert(#[from] matchit::InsertError),
 }
