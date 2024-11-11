@@ -51,5 +51,5 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@nightly
 
-      - name: Check formatting
+      - name: Run tests
         run: cargo test --all
