@@ -1,7 +1,7 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
 //! # tunnelbana-headers
 //! A tower middleware to add headers to specific routes, or route groups.
-//! 
+//!
 //! Part of the [tunnelbana](https://github.com/randomairborne/tunnelbana) project.
 //!
 //! # Example
@@ -118,9 +118,9 @@ pub fn parse(header_file: &str) -> Result<Vec<HeaderGroup>, HeaderParseError> {
 #[error("at line {row}: {kind}")]
 /// Describes the location and type of a header parsing problem.
 pub struct HeaderParseError {
-    row: usize,
+    pub row: usize,
     #[source]
-    kind: HeaderParseErrorKind,
+    pub kind: HeaderParseErrorKind,
 }
 
 impl HeaderParseError {
