@@ -12,8 +12,8 @@ use std::{
 use bytes::Bytes;
 use http::{header, HeaderValue, Request, Response, StatusCode};
 use http_body_util::{combinators::UnsyncBoxBody, BodyExt};
-use matchit::Router;
 pub use matchit::InsertError;
+use matchit::Router;
 use simpleinterpolation::{Interpolation, RenderError};
 use tower::{Layer, Service};
 

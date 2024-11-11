@@ -2,7 +2,7 @@
 //! # tunnelbana-etags
 //! An [`ETag`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/ETag) adding middleware
 //! for Rust and especially [`ServeDir`](https://docs.rs/tower-http/0.6.1/tower_http/services/struct.ServeDir.html).
-//! 
+//!
 //! Part of the [tunnelbana](https://github.com/randomairborne/tunnelbana) project.
 //!
 //! # Example
