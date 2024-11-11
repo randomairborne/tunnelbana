@@ -3,7 +3,7 @@
 //! # tunnelbana
 //!
 //! tunnelbana is a binary which uses the [tunnelbana project](https://github.com/randomairborne/tunnelbana)
-//! to build a static file server. 
+//! to build a static file server.
 use std::{
     io::{Error as IoError, ErrorKind as IoErrorKind},
     path::Path,
