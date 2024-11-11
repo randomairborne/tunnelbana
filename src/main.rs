@@ -7,9 +7,7 @@ use std::{
     time::Duration,
 };
 
-use bytes::Bytes;
-use http::{Request, Response, StatusCode};
-use http_body_util::{combinators::UnsyncBoxBody, BodyExt, Empty};
+use http::StatusCode;
 use hyper_util::{
     rt::TokioExecutor,
     server::{conn::auto::Builder as ConnBuilder, graceful::GracefulShutdown},
@@ -20,7 +18,6 @@ use tower::ServiceBuilder;
 use tower_http::{
     services::{ServeDir, ServeFile},
     set_status::SetStatusLayer,
-    validate_request::ValidateRequestHeaderLayer,
 };
 use tracing::Level;
 use tunnelbana_etags::{ETagLayer, ETagMap};
@@ -81,14 +78,16 @@ async fn main() {
         .precompressed_zstd()
         .fallback(not_found_svc);
 
-    let hide_special_files = ValidateRequestHeaderLayer::custom(hide_special_files);
+    let hide_special_files = tunnelbana_hidepaths::HidePathLayer::builder()
+        .hide_all(RESERVED_PATHS)
+        .build()
+        .expect("Failed to build path hide layer");
 
     let service = ServiceBuilder::new()
         .layer(header_add_mw)
         .layer(redirect_mw)
         .layer(etag_mw)
         .layer(hide_special_files)
-        .map_response(|res: Response<_>| res.map(UnsyncBoxBody::new))
         .service(serve_dir);
 
     let listener = TcpListener::bind("0.0.0.0:8080")
@@ -140,26 +139,6 @@ async fn main() {
             error!("Waited 10 seconds for graceful shutdown, aborting...");
         }
     }
-}
-
-fn hide_special_files<T>(
-    req: &mut Request<T>,
-) -> Result<(), Response<UnsyncBoxBody<Bytes, IoError>>> {
-    for reserved_start in RESERVED_PATHS {
-        let path = req.uri().path();
-        if path.starts_with(reserved_start)
-            && !path.trim_start_matches(reserved_start).contains('/')
-        {
-            return {
-                let mut resp = Response::new(UnsyncBoxBody::new(
-                    Empty::new().map_err(|never| match never {}),
-                ));
-                *resp.status_mut() = StatusCode::NOT_FOUND;
-                Err(resp)
-            };
-        }
-    }
-    Ok(())
 }
 
 fn read_with_default_if_nonexistent(path: impl AsRef<Path>) -> Result<String, IoError> {

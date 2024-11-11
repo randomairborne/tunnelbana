@@ -755,11 +755,8 @@ dependencies = [
 name = "tunnelbana"
 version = "0.1.0"
 dependencies = [
- "bytes",
  "http",
- "http-body-util",
  "hyper-util",
- "thiserror",
  "tokio",
  "tower",
  "tower-http",
@@ -767,6 +764,7 @@ dependencies = [
  "tracing-subscriber",
  "tunnelbana-etags",
  "tunnelbana-headers",
+ "tunnelbana-hidepaths",
  "tunnelbana-redirects",
  "vss",
 ]
@@ -794,10 +792,23 @@ dependencies = [
  "bytes",
  "http",
  "http-body",
- "http-body-util",
  "matchit",
  "pin-project",
  "thiserror",
+ "tower",
+ "tracing",
+]
+
+[[package]]
+name = "tunnelbana-hidepaths"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "http",
+ "http-body",
+ "http-body-util",
+ "matchit",
+ "pin-project",
  "tower",
  "tracing",
 ]

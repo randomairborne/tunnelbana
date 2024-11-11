@@ -1,0 +1,19 @@
+[package]
+name = "tunnelbana-hidepaths"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# http
+tower = "0.5"
+http = "1"
+http-body = "1"
+http-body-util = "0.1"
+bytes = "1"
+
+# utils
+pin-project = "1"
+tracing = "0.1"
+
+# router
+matchit = "0.8"
