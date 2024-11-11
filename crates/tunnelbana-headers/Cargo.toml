@@ -1,6 +1,6 @@
 [package]
 name = "tunnelbana-headers"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["valkyrie_pilot <valk@randomairborne.dev>"]
 description = "Parse cloudflare-style _headers files and add them to your HTTP servers"
