@@ -1,4 +1,28 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
+//! # tunnelbana-redirects
+//! Generate redirect lists from cloudflare-style _redirects text files and serve them with tower.
+//!
+//! Part of the [tunnelbana](https://github.com/randomairborne/tunnelbana) project.
+//!
+//! # Example
+//! ```rust
+//! use tower_http::services::ServeDir;
+//! use tower::{ServiceBuilder, ServiceExt};
+//! use http::Response;
+//! use tunnelbana_redirects::RedirectsLayer;
+//!
+//! let config = r#"
+//!/example https://example.com 302
+//!/subpath/{other}/final /{other}/final/ 302
+//!/wildcard/{*wildcard} /{wildcard}
+//!"#;
+//! let redirects = tunnelbana_redirects::parse(config).expect("Failed to parse redirects");
+//! let redirects_mw = RedirectsLayer::new(redirects).expect("Failed to route redirects");
+//! let serve_dir = ServeDir::new("/var/www/html").append_index_html_on_directories(true);
+//! let service = ServiceBuilder::new()
+//!    .layer(redirects_mw)
+//!    .service(serve_dir);
+//! ```
 use std::{
     borrow::Cow,
     collections::HashMap,
