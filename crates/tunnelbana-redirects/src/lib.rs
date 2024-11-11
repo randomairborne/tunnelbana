@@ -13,6 +13,7 @@ use bytes::Bytes;
 use http::{header, HeaderValue, Request, Response, StatusCode};
 use http_body_util::{combinators::UnsyncBoxBody, BodyExt};
 use matchit::Router;
+pub use matchit::InsertError;
 use simpleinterpolation::{Interpolation, RenderError};
 use tower::{Layer, Service};
 
@@ -20,6 +21,7 @@ use tower::{Layer, Service};
 extern crate tracing;
 
 #[derive(Clone)]
+/// A representation of a redirect, with where it should go and its triggers.
 pub struct Redirect {
     pub path: String,
     pub target: Interpolation,
@@ -113,11 +115,12 @@ const fn cowify<'a>(v: (&'a str, &'a str)) -> (Cow<'a, str>, Cow<'a, str>) {
 }
 
 #[derive(Debug, thiserror::Error)]
-#[error("{kind}")]
+#[error("at row {row}: {kind}")]
+/// Error struct for unparsable redirects. Includes line number and type of error.
 pub struct RedirectParseError {
-    row: usize,
+    pub row: usize,
     #[source]
-    kind: RedirectParseErrorKind,
+    pub kind: RedirectParseErrorKind,
 }
 
 impl RedirectParseError {
@@ -127,6 +130,7 @@ impl RedirectParseError {
 }
 
 #[derive(Debug, thiserror::Error)]
+/// Types of errors that can happen, e.g. wrong number of items on a row, unparsable status code.
 pub enum RedirectParseErrorKind {
     #[error("Wrong number of entries on a line: {0}, expected 2 or 3")]
     WrongOptCount(usize),
@@ -145,6 +149,7 @@ pub enum RedirectParseErrorKind {
 }
 
 #[derive(Clone)]
+/// a [`tower::Layer`] to add to a [`tower::ServiceBuilder`] to add redirects.
 pub struct RedirectsLayer {
     redirects: Arc<matchit::Router<(Interpolation, StatusCode)>>,
 }
@@ -153,7 +158,7 @@ impl RedirectsLayer {
     /// Create a new [`RedirectsLayer`] from a list of [`Redirect`]s.
     /// # Errors
     /// This function can error if you have two redirects for the same path.
-    pub fn new(redirect_list: Vec<Redirect>) -> Result<Self, Error> {
+    pub fn new(redirect_list: Vec<Redirect>) -> Result<Self, InsertError> {
         let mut redirects = Router::new();
         for redirect in redirect_list {
             redirects.insert(redirect.path, (redirect.target, redirect.code))?;
@@ -179,12 +184,15 @@ impl<S> Layer<S> for RedirectsLayer {
 }
 
 #[derive(Clone)]
+/// a [`tower::Service`] to add redirects to a wrapped service.
 pub struct Redirects<S> {
     redirects: Arc<matchit::Router<(Interpolation, StatusCode)>>,
     inner: S,
 }
 
 #[pin_project::pin_project(project = PinResponseSource)]
+/// Future type which can return an unmodified request, a redirect, or
+/// an error if a value in the path capture is not a valid header value.
 pub enum ResponseFuture<F> {
     Child(#[pin] F),
     Redirect(HeaderValue, StatusCode),
@@ -269,10 +277,4 @@ where
             ResponseFuture::Child(self.inner.call(req))
         }
     }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    #[error("Could not add route: {0}")]
-    Insert(#[from] matchit::InsertError),
 }
