@@ -43,3 +43,13 @@ jobs:
         run: cargo doc --workspace
         env:
           RUSTFLAGS: "-D warnings"
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@nightly
+
+      - name: Check formatting
+        run: cargo test --all
