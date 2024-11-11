@@ -8,7 +8,6 @@ edition = "2021"
 tower = "0.5"
 http = "1"
 http-body = "1"
-http-body-util = "0.1"
 bytes = "1"
 
 # utils
