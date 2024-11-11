@@ -10,6 +10,9 @@ use http::HeaderValue;
 
 #[derive(Debug)]
 #[allow(clippy::module_name_repetitions)]
+/// A map of String-based static paths to [`ResourceTagSet`]s.
+/// This serves as a simple wrapper type, just to prove that the created
+/// map is valid.
 pub struct ETagMap {
     map: HashMap<String, Arc<ResourceTagSet>>,
 }
@@ -22,6 +25,11 @@ impl Deref for ETagMap {
     }
 }
 
+/// A set of resource tags and their invertible set.
+/// This is used to implement both returning the correct
+/// `ETag` based on content encoding, and responding with 304
+/// if any compression permutation at that location matches a
+/// stored resource tag.
 #[derive(Debug, Clone)]
 pub struct ResourceTagSet {
     tags: ResourceTags,
@@ -29,12 +37,18 @@ pub struct ResourceTagSet {
 }
 
 impl ResourceTagSet {
+    /// Find if this set has a header, to decide if we want to return
+    /// a 304
     pub fn contains_tag(&self, value: &HeaderValue) -> bool {
         self.contained_tags.contains(value)
     }
 }
 
 #[derive(Debug, Clone)]
+/// List of resource tags, matched to their compression permutation.
+/// Compressed tags are optional. If they are not present, it is assumed
+/// that the compression will not be sent- and no etag is returned if a wrong
+/// etag is sent.
 pub struct ResourceTags {
     pub raw: HeaderValue,
     pub gzip: Option<HeaderValue>,
@@ -61,6 +75,7 @@ impl From<ResourceTags> for ResourceTagSet {
 }
 
 impl ResourceTags {
+    /// Make a [`HashSet`] of all the [`Some`] and non-optional tags.
     fn setify(self) -> HashSet<HeaderValue> {
         fn insert_if_some(s: &mut HashSet<HeaderValue>, v: Option<HeaderValue>) {
             if let Some(v) = v {
@@ -82,7 +97,7 @@ impl ETagMap {
     /// `.gz`, `.zz`, `.zst`, and `.br` files will be automatically incorporated
     /// into their parents.
     /// # Errors
-    /// This function can error if mmap fails in b3, or if paths cannot be generated
+    /// This function can error if mmap fails in blake3, or if paths cannot be generated
     pub fn new(base_dir: &Path) -> Result<Self, TagMapBuildError> {
         let files = get_file_list(base_dir)?;
         trace!(?files, count = files.len(), "Hashing files");
@@ -159,6 +174,7 @@ fn get_file_list(path: &Path) -> Result<Vec<PathBuf>, TagMapBuildError> {
 
 #[derive(Debug, thiserror::Error)]
 #[allow(clippy::module_name_repetitions)]
+/// Error returned when [`ETagMap::new`] fails.
 pub enum TagMapBuildError {
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),

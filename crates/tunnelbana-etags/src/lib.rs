@@ -1,4 +1,25 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
+//! # tunnelbana-etags
+//! An ETag adding middleware for Rust and [`ServeDir`](tower_http::services::fs::ServeDir)
+//! Part of the [tunnelbana](https://github.com/randomairborne/tunnelbana) project.
+//!
+//! # Example
+//! ```rust,no_run
+//! use http_body_util::combinators::UnsyncBoxBody;
+//! use tower_http::services::fs::ServeDir;
+//! use tower::{ServiceBuilder, ServiceExt};
+//! use http::Response;
+//! use tunnelbana_etags::{ETagLayer, ETagMap};
+//!
+//! let path = std::path::PathBuf::from("/var/www/html");
+//! let etags = ETagMap::new(&path).expect("Failed to generate etags");
+//! let etag_mw = ETagLayer::new(etags);
+//! let serve_dir = ServeDir::new(path).append_index_html_on_directories(true);
+//! let service = ServiceBuilder::new()
+//!    .layer(etag_mw)
+//!    .service(serve_dir);
+//! ```
+
 use std::{
     convert::Infallible,
     future::Future,
@@ -20,6 +41,7 @@ mod tag_map;
 pub use tag_map::{ETagMap, TagMapBuildError};
 
 #[derive(Clone)]
+/// A [`tower::Layer`] that adds an etag to wrapped services.
 pub struct ETagLayer {
     tags: Arc<ETagMap>,
 }
@@ -45,15 +67,25 @@ impl<S> Layer<S> for ETagLayer {
 }
 
 #[derive(Clone)]
+/// An implementation of a tower service which adds etags to a service which it wraps.
 pub struct ETag<S> {
     tags: Arc<ETagMap>,
     inner: S,
 }
 
 #[pin_project::pin_project(project = PinResponseOpts)]
+/// A future representing possible states of the request.
 pub enum ResponseFuture<F> {
+    /// No etag has been found. Request & response will be
+    /// forwarded trainsparently.
     NoETag(#[pin] F),
+    /// A [`ResourceTagSet`] has been found at this path.
+    /// Its etag will be added to the response based on
+    /// compression.
     ChildRespWithETag(#[pin] F, Arc<ResourceTagSet>),
+    /// An `If-None-Match` header was sent which matched
+    /// a value within the [`ResourceTagSet`]. A response
+    /// will be returned directly.
     NotModified(HeaderValue),
 }
 

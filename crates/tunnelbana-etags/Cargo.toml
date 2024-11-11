@@ -2,6 +2,13 @@
 name = "tunnelbana-etags"
 version = "0.1.0"
 edition = "2021"
+authors = ["valkyrie_pilot <valk@randomairborne.dev>"]
+description = "Generate etags for static files and serve them with tower."
+keywords = ["etags", "caching"]
+categories = ["web-programming", "caching"]
+repository = "https://github.com/randomairborne/tunnelbana"
+readme = "README.txt"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 # blake3
@@ -18,3 +25,7 @@ bytes = "1"
 pin-project = "1"
 tracing = "0.1"
 thiserror = "2"
+
+[dev-dependencies]
+tower-http = { version = "0.6", features = ["fs"] }
+tower = { version = "0.5", features = ["util"] }
