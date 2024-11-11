@@ -41,8 +41,8 @@ use http::{
     header::{InvalidHeaderName, InvalidHeaderValue},
     HeaderName, HeaderValue, Request, Response,
 };
-use matchit::Router;
 pub use matchit::InsertError;
+use matchit::Router;
 use tower::{Layer, Service};
 
 type BonusHeaders = Arc<[(HeaderName, HeaderValue)]>;
