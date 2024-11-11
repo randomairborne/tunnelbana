@@ -3,10 +3,10 @@
 Tunnelbana is a collection of crates designed to make fast Rust static file servers with
 [tower](https://github.com/tower-rs/tower). It's named for the swedish word for subway.
 
-![tunnelbana-etags](https://img.shields.io/crates/v/tunnelbana-etags)
-![tunnelbana-headers](https://img.shields.io/crates/v/tunnelbana-headers)
-![tunnelbana-hidepaths](https://img.shields.io/crates/v/tunnelbana-hidepaths)
-![tunnelbana-redirects](https://img.shields.io/crates/v/tunnelbana-redirects)
+[tunnelbana-etags](https://crates.io/crates/tunnelbana-etags)
+[tunnelbana-headers](https://crates.io/crates/tunnelbana-headers)
+[tunnelbana-hidepaths](https://crates.io/crates/tunnelbana-hidepaths)
+[tunnelbana-redirects](https://crates.io/crates/tunnelbana-redirects)
 
 ## Why?
 
