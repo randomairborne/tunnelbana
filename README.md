@@ -3,11 +3,6 @@
 Tunnelbana is a collection of crates designed to make fast Rust static file servers with
 [tower](https://github.com/tower-rs/tower). It's named for the swedish word for subway.
 
-[tunnelbana-etags](https://crates.io/crates/tunnelbana-etags)
-[tunnelbana-headers](https://crates.io/crates/tunnelbana-headers)
-[tunnelbana-hidepaths](https://crates.io/crates/tunnelbana-hidepaths)
-[tunnelbana-redirects](https://crates.io/crates/tunnelbana-redirects)
-
 ## Why?
 
 Tunnelbana was created to reduce my dependence on Cloudflare. I love Cloudflare and their services,
@@ -89,3 +84,13 @@ Limitations:
 /{capture}/ /en/{capture}/
 /en/{*splat} /{splat}
 ```
+
+## I like one of these features, and I want it in my app
+
+You're in luck! Almost everything in Tunnelbana is a seperated crate- all the main executable does
+is glue them together.
+
+- [tunnelbana-etags](https://crates.io/crates/tunnelbana-etags) is an ETag generation system that works closely with [`ServeDir`](https://docs.rs/tower-http/0.6.1/tower_http/services/struct.ServeDir.html)
+- [tunnelbana-headers](https://crates.io/crates/tunnelbana-headers) adds headers to routes, and can parse `_headers` files.
+- [tunnelbana-hidepaths](https://crates.io/crates/tunnelbana-hidepaths) is a simple layer which can respond with 404s to specific paths.
+- [tunnelbana-redirects](https://crates.io/crates/tunnelbana-redirects) turns routes into redirects, and can parse `_redirects` files.
