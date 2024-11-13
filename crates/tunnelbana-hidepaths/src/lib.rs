@@ -244,9 +244,8 @@ impl std::future::Future for DefaultNotFoundFuture {
 
 #[cfg(test)]
 mod tests {
-    use http_body_util::Empty;
-    use http_body_util::BodyExt;
     use http::Request;
+    use http_body_util::{BodyExt, Empty};
     use tower::ServiceExt;
 
     fn request(url: &str) -> Request<Empty<Bytes>> {
@@ -257,20 +256,48 @@ mod tests {
     #[tokio::test]
     async fn path_hidden() {
         let body = "test string";
-        let layer = HidePathsLayer::builder().hide("/example.html").build().unwrap();
-        let svc = tower::ServiceBuilder::new().layer(layer).service_fn(|_: Request<Empty<Bytes>>| async move { Ok::<_, Infallible>(Response::new(http_body_util::Full::new(Bytes::from(body)))) });
+        let layer = HidePathsLayer::builder()
+            .hide("/example.html")
+            .build()
+            .unwrap();
+        let svc = tower::ServiceBuilder::new().layer(layer).service_fn(
+            |_: Request<Empty<Bytes>>| async move {
+                Ok::<_, Infallible>(Response::new(http_body_util::Full::new(Bytes::from(body))))
+            },
+        );
         let not_found = svc.clone().oneshot(request("/example.html")).await.unwrap();
         assert_eq!(not_found.status(), StatusCode::NOT_FOUND);
-        assert!(not_found.body().clone().collect().await.unwrap().to_bytes().is_empty());
+        assert!(not_found
+            .body()
+            .clone()
+            .collect()
+            .await
+            .unwrap()
+            .to_bytes()
+            .is_empty());
     }
 
     #[tokio::test]
     async fn path_not_hidden() {
         let body = "test string";
-        let layer = HidePathsLayer::builder().hide("/example.html").build().unwrap();
-        let svc = tower::ServiceBuilder::new().layer(layer).service_fn(|_: Request<Empty<Bytes>>| async move { Ok::<_, Infallible>(Response::new(http_body_util::Full::new(Bytes::from(body)))) });
-        let not_found = svc.clone().oneshot(request("/example.htmlb")).await.unwrap();
+        let layer = HidePathsLayer::builder()
+            .hide("/example.html")
+            .build()
+            .unwrap();
+        let svc = tower::ServiceBuilder::new().layer(layer).service_fn(
+            |_: Request<Empty<Bytes>>| async move {
+                Ok::<_, Infallible>(Response::new(http_body_util::Full::new(Bytes::from(body))))
+            },
+        );
+        let not_found = svc
+            .clone()
+            .oneshot(request("/example.htmlb"))
+            .await
+            .unwrap();
         assert_eq!(not_found.status(), StatusCode::OK);
-        assert_eq!(not_found.body().clone().collect().await.unwrap().to_bytes(), body);
+        assert_eq!(
+            not_found.body().clone().collect().await.unwrap().to_bytes(),
+            body
+        );
     }
 }
