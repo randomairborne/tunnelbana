@@ -18,6 +18,7 @@ use hyper_util::{
     service::TowerToHyperService,
 };
 use tokio::net::TcpListener;
+use tokio_util::task::TaskTracker;
 use tower::ServiceBuilder;
 use tower_http::{
     services::{ServeDir, ServeFile},
@@ -101,6 +102,7 @@ async fn main() {
 
     let server = ConnBuilder::new(TokioExecutor::new());
     let graceful = GracefulShutdown::new();
+    let tasks = TaskTracker::new();
     let mut ctrl_c = pin!(vss::shutdown_signal());
 
     loop {
@@ -115,7 +117,7 @@ async fn main() {
                         let conn = server.serve_connection_with_upgrades(stream, TowerToHyperService::new(service)).into_owned();
                         let conn = graceful.watch(conn.into_owned());
 
-                        tokio::spawn(async move {
+                        tasks.spawn(async move {
                             if let Err(err) = conn.await {
                                 warn!("connection error: {}", err);
                             }
@@ -142,6 +144,17 @@ async fn main() {
         },
         () = tokio::time::sleep(Duration::from_secs(10)) => {
             error!("Waited 10 seconds for graceful shutdown, aborting...");
+        }
+    }
+
+    tasks.close();
+
+    tokio::select! {
+        () = tasks.wait() => {
+            info!("All tasks exited!");
+        },
+        () = tokio::time::sleep(Duration::from_secs(10)) => {
+            error!("Waited 10 seconds for graceful task exit, aborting...");
         }
     }
 }

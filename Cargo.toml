@@ -32,6 +32,7 @@ tracing-subscriber = "0.3"
 
 # utilities
 vss = "0.1"
+tokio-util = { version = "0.7.12", features = ["rt"] }
 
 [workspace]
 members = ["crates/tunnelbana-etags", "crates/tunnelbana-headers", "crates/tunnelbana-hidepaths", "crates/tunnelbana-redirects"]
