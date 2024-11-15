@@ -6,7 +6,7 @@
 //! to build a static file server.
 use std::{
     io::{Error as IoError, ErrorKind as IoErrorKind},
-    path::Path,
+    path::{Path, PathBuf},
     pin::pin,
     time::Duration,
 };
@@ -40,13 +40,25 @@ const LOG_LEVEL: Level = Level::TRACE;
 #[cfg(not(debug_assertions))]
 const LOG_LEVEL: Level = Level::INFO;
 
+use argh::FromArgs;
+
+#[derive(FromArgs)]
+/// Serve a directory
+struct Args {
+    /// fall back to index.html rather than 404.html
+    #[argh(switch)]
+    spa: bool,
+
+    /// directory to serve
+    #[argh(positional)]
+    directory: PathBuf,
+}
+
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     tracing_subscriber::fmt().with_max_level(LOG_LEVEL).init();
-    let arg1 = std::env::args_os()
-        .nth(1)
-        .display_expect("Expected exactly 1 argument");
-    let location = Path::new(&arg1);
+    let args: Args = argh::from_env();
+    let location = Path::new(&args.directory);
     assert!(location.is_dir(), "Expected argument 1 to be a directory");
     let location = location.canonicalize().unwrap();
 
@@ -67,13 +79,19 @@ async fn main() {
 
     let etag_mw = ETagLayer::new(etags);
 
-    let not_found_svc = ServeFile::new(location.join("404.html"))
+    let (not_found_path, not_found_status_layer) = if args.spa {
+        ("index.html", None)
+    } else {
+        ("404.html", Some(SetStatusLayer::new(StatusCode::NOT_FOUND)))
+    };
+
+    let not_found_svc = ServeFile::new(location.join(not_found_path))
         .precompressed_br()
         .precompressed_deflate()
         .precompressed_gzip()
         .precompressed_zstd();
     let not_found_svc = ServiceBuilder::new()
-        .layer(SetStatusLayer::new(StatusCode::NOT_FOUND))
+        .option_layer(not_found_status_layer)
         .service(not_found_svc);
     let serve_dir = ServeDir::new(location)
         .append_index_html_on_directories(true)
@@ -138,6 +156,10 @@ async fn main() {
         }
     }
 
+    shut_down(graceful, tasks).await;
+}
+
+async fn shut_down(graceful: GracefulShutdown, tasks: TaskTracker) {
     tokio::select! {
         () = graceful.shutdown() => {
             info!("Gracefully shutdown!");
