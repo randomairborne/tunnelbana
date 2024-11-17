@@ -45,3 +45,6 @@ tunnelbana-headers = { path = "crates/tunnelbana-headers" }
 tunnelbana-redirects = { path = "crates/tunnelbana-redirects" }
 tunnelbana-hidepaths = { path = "crates/tunnelbana-hidepaths" }
 
+[profile.release]
+lto = "fat"
+codegen-units = 1
