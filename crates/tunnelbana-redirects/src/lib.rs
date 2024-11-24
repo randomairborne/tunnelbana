@@ -57,6 +57,9 @@ pub struct Redirect {
 /// This function errors if your status code is malformed, your target cannot be a header value,
 /// or if your name cannot be a matchit path.
 pub fn parse(redirect_file: &str) -> Result<Vec<Redirect>, RedirectParseError> {
+    if redirect_file.is_empty() {
+        return Ok(Vec::new());
+    }
     let mut redirects = Vec::new();
     for (idx, line) in redirect_file.lines().enumerate() {
         if line.is_empty() || line.starts_with('#') {

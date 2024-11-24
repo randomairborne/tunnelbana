@@ -61,6 +61,9 @@ pub struct HeaderGroup {
 /// This function errors if you have an orphaned header definition, if you have an invalid header name or value,
 /// or if your name cannot be a matchit path.
 pub fn parse(header_file: &str) -> Result<Vec<HeaderGroup>, HeaderParseError> {
+    if header_file.is_empty() {
+        return Ok(Vec::new());
+    }
     let mut headers = Vec::new();
     let mut current_ctx: Option<HeaderGroup> = None;
     for (idx, line) in header_file.lines().enumerate() {
