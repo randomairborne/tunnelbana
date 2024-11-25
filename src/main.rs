@@ -1,5 +1,4 @@
 #![warn(clippy::all, clippy::pedantic, clippy::nursery)]
-#![allow(clippy::redundant_pub_crate)] // tokio::select!
 //! # tunnelbana
 //!
 //! tunnelbana is a binary which uses the [tunnelbana project](https://github.com/randomairborne/tunnelbana)
@@ -11,6 +10,7 @@ use std::{
     time::Duration,
 };
 
+use futures_util::future::Either;
 use http::StatusCode;
 use hyper_util::{
     rt::TokioExecutor,
@@ -125,60 +125,70 @@ async fn main() {
 
     loop {
         let service = service.clone();
-        tokio::select! {
-            conn = listener.accept() => {
-                match conn {
-                    Ok((stream, peer_addr)) => {
-                        info!("incoming connection accepted: {}", peer_addr);
-                        let stream = hyper_util::rt::TokioIo::new(Box::pin(stream));
-
-                        let conn = server.serve_connection_with_upgrades(stream, TowerToHyperService::new(service)).into_owned();
-                        let conn = graceful.watch(conn.into_owned());
-
-                        tasks.spawn(async move {
-                            if let Err(err) = conn.await {
-                                warn!("connection error: {}", err);
-                            }
-                            debug!("connection dropped: {}", peer_addr);
-                        });
-                    },
-                    Err(e) => {
-                        warn!("accept error: {}", e);
-                        return;
-                    }
-                };
-            },
-            () = ctrl_c.as_mut() => {
-                drop(listener);
-                info!("Ctrl-C received, starting shutdown");
-                break;
+        let listener_fut = pin!(listener.accept());
+        let selected = futures_util::future::select(listener_fut, ctrl_c.as_mut()).await;
+        let Either::Left((conn, _)) = selected else {
+            info!("Ctrl-C received, starting shutdown");
+            break;
+        };
+        let (stream, peer_addr) = match conn {
+            Ok(v) => v,
+            Err(e) => {
+                warn!("accept error: {}", e);
+                continue;
             }
-        }
+        };
+        info!("incoming connection accepted: {}", peer_addr);
+        let stream = hyper_util::rt::TokioIo::new(Box::pin(stream));
+
+        let conn = server
+            .serve_connection_with_upgrades(stream, TowerToHyperService::new(service))
+            .into_owned();
+        let conn = graceful.watch(conn.into_owned());
+
+        tasks.spawn(async move {
+            if let Err(err) = conn.await {
+                warn!("connection error: {}", err);
+            }
+            debug!("connection dropped: {}", peer_addr);
+        });
     }
 
     shut_down(graceful, tasks).await;
 }
 
 async fn shut_down(graceful: GracefulShutdown, tasks: TaskTracker) {
-    tokio::select! {
-        () = graceful.shutdown() => {
+    const SHUTDOWN_GRACEFUL_DEADLINE: Duration = Duration::from_secs(5);
+    match futures_util::future::select(
+        pin!(graceful.shutdown()),
+        pin!(tokio::time::sleep(SHUTDOWN_GRACEFUL_DEADLINE)),
+    )
+    .await
+    {
+        Either::Left(_) => {
             info!("Gracefully shutdown!");
-        },
-        () = tokio::time::sleep(Duration::from_secs(10)) => {
-            error!("Waited 10 seconds for graceful shutdown, aborting...");
         }
-    }
+        Either::Right(_) => {
+            error!("Waited 10 seconds for graceful shutdown, aborting...");
+            return;
+        }
+    };
 
     tasks.close();
 
-    tokio::select! {
-        () = tasks.wait() => {
-            info!("All tasks exited!");
-        },
-        () = tokio::time::sleep(Duration::from_secs(10)) => {
-            error!("Waited 10 seconds for graceful task exit, aborting...");
+    match futures_util::future::select(
+        pin!(tasks.wait()),
+        pin!(tokio::time::sleep(SHUTDOWN_GRACEFUL_DEADLINE)),
+    )
+    .await
+    {
+        Either::Left(_) => {
+            info!("Gracefully shutdown!");
         }
-    }
+        Either::Right(_) => {
+            error!("Waited 10 seconds for graceful shutdown, aborting...");
+        }
+    };
 }
 
 fn read_with_default_if_nonexistent(path: impl AsRef<Path>) -> Result<String, IoError> {

@@ -35,6 +35,7 @@ vss = "0.1"
 tokio-util = { version = "0.7.12", features = ["rt"] }
 argh = "0.1.12"
 hyper = { version = "1.5.0", features = ["http1", "http2", "server"] }
+futures-util = { version = "0.3", default-features = false }
 
 [workspace]
 members = ["crates/tunnelbana-etags", "crates/tunnelbana-headers", "crates/tunnelbana-hidepaths", "crates/tunnelbana-redirects"]
