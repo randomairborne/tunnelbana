@@ -13,7 +13,7 @@ use std::{
 use futures_util::future::Either;
 use http::StatusCode;
 use hyper_util::{
-    rt::TokioExecutor,
+    rt::{TokioExecutor, TokioIo},
     server::{conn::auto::Builder as ConnBuilder, graceful::GracefulShutdown},
     service::TowerToHyperService,
 };
@@ -139,7 +139,7 @@ async fn main() {
             }
         };
         info!("incoming connection accepted: {}", peer_addr);
-        let stream = hyper_util::rt::TokioIo::new(Box::pin(stream));
+        let stream = TokioIo::new(Box::pin(stream));
 
         let conn = server
             .serve_connection_with_upgrades(stream, TowerToHyperService::new(service))
