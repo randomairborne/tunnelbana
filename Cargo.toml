@@ -12,7 +12,7 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 # tokio
-tokio = { version = "1", features = ["rt", "net", "fs", "macros"] }
+tokio = { version = "1", features = ["rt", "net", "fs"] }
 tokio-util = { version = "0.7", features = ["rt"] }
 
 # internal

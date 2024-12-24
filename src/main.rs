@@ -17,7 +17,7 @@ use hyper_util::{
     server::{conn::auto::Builder as ConnBuilder, graceful::GracefulShutdown},
     service::TowerToHyperService,
 };
-use tokio::net::TcpListener;
+use tokio::{net::TcpListener, runtime::Builder as RuntimeBuilder};
 use tokio_util::task::TaskTracker;
 use tower::ServiceBuilder;
 use tower_http::{
@@ -54,8 +54,7 @@ struct Args {
     directory: PathBuf,
 }
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() {
+fn main() {
     tracing_subscriber::fmt().with_max_level(LOG_LEVEL).init();
     let args: Args = argh::from_env();
     let location = Path::new(&args.directory);
@@ -114,47 +113,57 @@ async fn main() {
         .layer(hide_special_files)
         .service(serve_dir);
 
-    let listener = TcpListener::bind("0.0.0.0:8080")
-        .await
+    let rt = RuntimeBuilder::new_current_thread()
+        .enable_all()
+        .thread_name("tunnelbana-worker")
+        .build()
+        .expect("Invalid runtime config");
+
+    let listener = rt
+        .block_on(TcpListener::bind("0.0.0.0:8080"))
         .display_expect("Failed to bind to port 8080");
 
     let server = ConnBuilder::new(TokioExecutor::new());
     let graceful = GracefulShutdown::new();
     let tasks = TaskTracker::new();
-    let mut ctrl_c = pin!(vss::shutdown_signal());
+    let ctrl_c = vss::shutdown_signal();
 
-    loop {
-        let service = service.clone();
-        let listener_fut = pin!(listener.accept());
-        let selected = futures_util::future::select(listener_fut, ctrl_c.as_mut()).await;
-        let Either::Left((conn, _)) = selected else {
-            info!("Ctrl-C received, starting shutdown");
-            break;
-        };
-        let (stream, peer_addr) = match conn {
-            Ok(v) => v,
-            Err(e) => {
-                warn!("accept error: {}", e);
-                continue;
-            }
-        };
-        info!("incoming connection accepted: {}", peer_addr);
-        let stream = TokioIo::new(Box::pin(stream));
+    let main_task = rt.spawn(async move {
+        let mut ctrl_c = pin!(ctrl_c);
+        loop {
+            let service = service.clone();
+            let listener_fut = pin!(listener.accept());
+            let selected = futures_util::future::select(listener_fut, ctrl_c.as_mut()).await;
+            let Either::Left((conn, _)) = selected else {
+                info!("Ctrl-C received, starting shutdown");
+                break;
+            };
+            let (stream, peer_addr) = match conn {
+                Ok(v) => v,
+                Err(e) => {
+                    warn!("accept error: {}", e);
+                    continue;
+                }
+            };
+            info!("incoming connection accepted: {}", peer_addr);
+            let stream = TokioIo::new(Box::pin(stream));
 
-        let conn = server
-            .serve_connection_with_upgrades(stream, TowerToHyperService::new(service))
-            .into_owned();
-        let conn = graceful.watch(conn.into_owned());
+            let conn = server
+                .serve_connection_with_upgrades(stream, TowerToHyperService::new(service))
+                .into_owned();
+            let conn = graceful.watch(conn.into_owned());
 
-        tasks.spawn(async move {
-            if let Err(err) = conn.await {
-                warn!("connection error: {}", err);
-            }
-            debug!("connection dropped: {}", peer_addr);
-        });
-    }
+            tasks.spawn(async move {
+                if let Err(err) = conn.await {
+                    warn!("connection error: {}", err);
+                }
+                debug!("connection dropped: {}", peer_addr);
+            });
+        }
+        shut_down(graceful, tasks).await;
+    });
 
-    shut_down(graceful, tasks).await;
+    rt.block_on(main_task).expect("Background task failed");
 }
 
 async fn shut_down(graceful: GracefulShutdown, tasks: TaskTracker) {
