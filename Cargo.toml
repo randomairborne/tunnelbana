@@ -1,6 +1,6 @@
 [package]
 name = "tunnelbana"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 authors = ["valkyrie_pilot <valk@randomairborne.dev>"]
 description = "Serve static websites with ease and speed."
@@ -23,7 +23,7 @@ tunnelbana-hidepaths = "0.1"
 
 # http
 tower = { version = "0.5",  features = ["util"] }
-tower-http = { version = "0.6", features = ["fs", "set-status"] }
+tower-http = { version = "0.6", features = ["fs", "set-status", "set-header"] }
 hyper-util = { version = "0.1", features = ["server", "server-graceful", "server-auto", "http1", "http2",  "service"] }
 http = "1"
 
