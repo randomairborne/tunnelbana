@@ -21,7 +21,9 @@ use tokio::{net::TcpListener, runtime::Builder as RuntimeBuilder};
 use tokio_util::task::TaskTracker;
 use tower::ServiceBuilder;
 use tower_http::{
-    services::{ServeDir, ServeFile}, set_header::SetResponseHeaderLayer, set_status::SetStatusLayer
+    services::{ServeDir, ServeFile},
+    set_header::SetResponseHeaderLayer,
+    set_status::SetStatusLayer,
 };
 use tracing::Level;
 use tunnelbana_etags::{ETagLayer, ETagMap};
@@ -105,7 +107,10 @@ fn main() {
         .build()
         .expect("Failed to build path hide layer");
 
-    let set_vary = SetResponseHeaderLayer::appending(http::header::VARY, HeaderValue::from_name(http::header::ACCEPT_ENCODING));
+    let set_vary = SetResponseHeaderLayer::appending(
+        http::header::VARY,
+        HeaderValue::from_name(http::header::ACCEPT_ENCODING),
+    );
 
     let service = ServiceBuilder::new()
         .layer(header_add_mw)
