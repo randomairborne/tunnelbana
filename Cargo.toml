@@ -34,7 +34,6 @@ tracing-subscriber = "0.3"
 # utilities
 vss = "0.1"
 argh = "0.1"
-hyper = { version = "1", features = ["http1", "http2", "server"] }
 futures-util = { version = "0.3", default-features = false }
 
 [workspace]

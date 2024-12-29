@@ -830,7 +830,6 @@ dependencies = [
  "argh",
  "futures-util",
  "http",
- "hyper",
  "hyper-util",
  "tokio",
  "tokio-util",
