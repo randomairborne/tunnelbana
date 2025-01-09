@@ -7,6 +7,7 @@ use std::{
     io::{Error as IoError, ErrorKind as IoErrorKind},
     path::{Path, PathBuf},
     pin::pin,
+    process::{ExitCode, Termination},
     time::Duration,
 };
 
@@ -55,27 +56,44 @@ struct Args {
     directory: PathBuf,
 }
 
-fn main() {
+#[derive(Debug)]
+struct Error(&'static str);
+
+impl Termination for Error {
+    fn report(self) -> ExitCode {
+        eprintln!("{}", self.0);
+        ExitCode::FAILURE
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+fn main() -> Result<(), Error> {
     tracing_subscriber::fmt().with_max_level(LOG_LEVEL).init();
     let args: Args = argh::from_env();
     let location = Path::new(&args.directory);
-    assert!(location.is_dir(), "Expected argument 1 to be a directory");
-    let location = location.canonicalize().unwrap();
+    if !location.is_dir() {
+        return Err(Error("Expected argument 1 to be a directory"));
+    }
+    let location = location
+        .canonicalize()
+        .map_err(|_| Error("Could not canonicalize directory"))?;
 
     let headers = read_with_default_if_nonexistent(location.join("_headers"))
-        .display_expect("Failed to read _headers");
-    let headers = tunnelbana_headers::parse(&headers).display_expect("Failed to parse _headers");
+        .map_err(|_| Error("Failed to read _headers"))?;
+    let headers =
+        tunnelbana_headers::parse(&headers).map_err(|_| Error("Failed to parse _headers"))?;
 
     let redirects = read_with_default_if_nonexistent(location.join("_redirects"))
-        .display_expect("Failed to read _redirects");
+        .map_err(|_| Error("Failed to read _redirects"))?;
     let redirects =
-        tunnelbana_redirects::parse(&redirects).display_expect("Failed to parse _redirects");
+        tunnelbana_redirects::parse(&redirects).map_err(|_| Error("Failed to parse _redirects"))?;
 
-    let etags = ETagMap::new(&location).display_expect("Failed to generate etags");
+    let etags = ETagMap::new(&location).map_err(|_| Error("Failed to generate etags"))?;
 
     let redirect_mw =
-        RedirectsLayer::new(redirects).display_expect("Failed to build redirects router");
-    let header_add_mw = HeadersLayer::new(headers).display_expect("Failed to build headers router");
+        RedirectsLayer::new(redirects).map_err(|_| Error("Failed to build redirects router"))?;
+    let header_add_mw =
+        HeadersLayer::new(headers).map_err(|_| Error("Failed to build headers router"))?;
 
     let etag_mw = ETagLayer::new(etags);
 
@@ -105,7 +123,7 @@ fn main() {
         .hide_all(RESERVED_PATHS)
         .with_not_found_service(not_found_svc)
         .build()
-        .expect("Failed to build path hide layer");
+        .map_err(|_| Error("Failed to build path hide layer"))?;
 
     let set_vary = SetResponseHeaderLayer::appending(
         http::header::VARY,
@@ -124,11 +142,11 @@ fn main() {
         .enable_all()
         .thread_name("tunnelbana-worker")
         .build()
-        .expect("Invalid runtime config");
+        .map_err(|_| Error("Invalid runtime config"))?;
 
     let listener = rt
         .block_on(TcpListener::bind("0.0.0.0:8080"))
-        .display_expect("Failed to bind to port 8080");
+        .map_err(|_| Error("Failed to bind to port 8080"))?;
 
     let server = ConnBuilder::new(TokioExecutor::new());
     let graceful = GracefulShutdown::new();
@@ -170,7 +188,9 @@ fn main() {
         shut_down(graceful, tasks).await;
     });
 
-    rt.block_on(main_task).expect("Background task failed");
+    rt.block_on(main_task)
+        .map_err(|_| Error("Background task failed"))?;
+    Ok(())
 }
 
 async fn shut_down(graceful: GracefulShutdown, tasks: TaskTracker) {
@@ -204,7 +224,7 @@ async fn shut_down(graceful: GracefulShutdown, tasks: TaskTracker) {
         Either::Right(_) => {
             error!("Waited 10 seconds for graceful shutdown, aborting...");
         }
-    };
+    }
 }
 
 fn read_with_default_if_nonexistent(path: impl AsRef<Path>) -> Result<String, IoError> {
@@ -214,29 +234,5 @@ fn read_with_default_if_nonexistent(path: impl AsRef<Path>) -> Result<String, Io
             IoErrorKind::NotFound => Ok(String::new()),
             _ => Err(e),
         },
-    }
-}
-
-pub trait DisplayExpect<T> {
-    fn display_expect(self, message: &str) -> T;
-}
-
-impl<T, E: std::fmt::Display> DisplayExpect<T> for Result<T, E> {
-    fn display_expect(self, msg: &str) -> T {
-        match self {
-            Ok(v) => v,
-            Err(e) => panic!("{msg}: {e}"),
-        }
-    }
-}
-
-impl<T> DisplayExpect<T> for Option<T> {
-    fn display_expect(self, msg: &str) -> T {
-        self.map_or_else(
-            || {
-                panic!("{msg}");
-            },
-            |v| v,
-        )
     }
 }
