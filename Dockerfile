@@ -1,13 +1,12 @@
-ARG LLVMTARGETARCH
-FROM --platform=${BUILDPLATFORM} ghcr.io/randomairborne/cross-cargo:${LLVMTARGETARCH} AS builder
-ARG LLVMTARGETARCH
+FROM rust:alpine AS builder
+
+RUN apk add musl-dev
 
 WORKDIR /build
 COPY . .
 
-RUN cargo build --release --target ${LLVMTARGETARCH}-unknown-linux-musl
+RUN cargo build --release
 
 FROM alpine:latest
-ARG LLVMTARGETARCH
 
-COPY --from=builder /build/target/${LLVMTARGETARCH}-unknown-linux-musl/release/tunnelbana /usr/bin/tunnelbana
+COPY --from=builder /build/target/release/tunnelbana /usr/bin/tunnelbana
