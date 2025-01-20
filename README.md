@@ -13,7 +13,7 @@ thing.
 
 Tunnelbana is available on [crates.io](https://crates.io/crates/tunnelbana), where it can be easily
 used as a binary with `tunnelbana /var/www/html` after a `cargo install tunnelbana`.
-It is also available on [ghcr.io](https://github.com/randomairborne/tunnelbana/pkgs/container/tunnelbana),
+It is also available on [ghcr](https://github.com/randomairborne/tunnelbana/pkgs/container/tunnelbana),
 where it can be used with bind mounts or as a build source for a container as demonstrated below.
 
 ## Docker
