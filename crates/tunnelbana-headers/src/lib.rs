@@ -106,29 +106,34 @@ pub fn parse(header_file: &str) -> Result<Vec<HeaderGroup>, HeaderParseError> {
             });
             std::mem::swap(&mut current_ctx, &mut group);
             if let Some(group) = group {
-                // A * character will register for all subpaths, and also the `/` path above it
-                if group.path.ends_with('*') {
-                    let end_idx = group.path.len() - 1;
-                    let base_path = &group.path[0..end_idx];
-                    headers.push(HeaderGroup {
-                        path: base_path.to_owned(),
-                        targets: group.targets.clone(),
-                    });
-                    headers.push(HeaderGroup {
-                        path: format!("{base_path}{{*all}}"),
-                        targets: group.targets.clone(),
-                    });
-                } else {
-                    headers.push(group);
-                }
+                group_add(&mut headers, group);
             }
         }
     }
-    if let Some(ctx) = current_ctx {
-        headers.push(ctx);
+    if let Some(group) = current_ctx {
+        group_add(&mut headers, group);
     }
     info!(?headers, "Got headers");
     Ok(headers)
+}
+
+fn group_add(headers: &mut Vec<HeaderGroup>, group: HeaderGroup) {
+    // A * character will register for all subpaths, and also the `/` path above it
+    if group.path.ends_with('*') {
+        let end_idx = group.path.len() - 1;
+        let base_path = &group.path[0..end_idx];
+        trace!("Generating wildcard for {base_path}");
+        headers.push(HeaderGroup {
+            path: base_path.to_owned(),
+            targets: group.targets.clone(),
+        });
+        headers.push(HeaderGroup {
+            path: format!("{base_path}{{*all}}"),
+            targets: group.targets.clone(),
+        });
+    } else {
+        headers.push(group);
+    }
 }
 
 #[derive(Debug, thiserror::Error)]

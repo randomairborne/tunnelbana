@@ -9,3 +9,6 @@
 
 /folder/{*v}
     in-folder: true
+
+/superfolder/*
+    in-superfolder: true

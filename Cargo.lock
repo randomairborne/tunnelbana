@@ -837,10 +837,10 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
- "tunnelbana-etags 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "tunnelbana-headers 0.1.1",
- "tunnelbana-hidepaths 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "tunnelbana-redirects 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tunnelbana-etags",
+ "tunnelbana-headers",
+ "tunnelbana-hidepaths",
+ "tunnelbana-redirects",
  "vss",
 ]
 
@@ -857,39 +857,6 @@ dependencies = [
  "thiserror",
  "tower",
  "tower-http",
- "tracing",
-]
-
-[[package]]
-name = "tunnelbana-etags"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49b2bd8cc21b0560d0ef794af90115553eb169c27c7b6f313b162777df5c6c0b"
-dependencies = [
- "blake3",
- "bytes",
- "http",
- "http-body",
- "http-body-util",
- "pin-project",
- "thiserror",
- "tower",
- "tracing",
-]
-
-[[package]]
-name = "tunnelbana-headers"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22c63bcdad0b595428f74b22313b5b422286e76783f9c34ec5be237cfe4fd912"
-dependencies = [
- "bytes",
- "http",
- "http-body",
- "matchit",
- "pin-project",
- "thiserror",
- "tower",
  "tracing",
 ]
 
@@ -925,22 +892,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tunnelbana-hidepaths"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ad973798d286111f923cbc9be9bb3edb9788a39f00b336c3be2c7586527d76b"
-dependencies = [
- "bytes",
- "http",
- "http-body",
- "http-body-util",
- "matchit",
- "pin-project",
- "tower",
- "tracing",
-]
-
-[[package]]
 name = "tunnelbana-redirects"
 version = "0.1.1"
 dependencies = [
@@ -954,24 +905,6 @@ dependencies = [
  "thiserror",
  "tower",
  "tower-http",
- "tracing",
-]
-
-[[package]]
-name = "tunnelbana-redirects"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82dbdbf47c53d97d67922a9c963e623642714339f271a68e271ba08ade479e0a"
-dependencies = [
- "bytes",
- "http",
- "http-body",
- "http-body-util",
- "matchit",
- "pin-project",
- "simpleinterpolation",
- "thiserror",
- "tower",
  "tracing",
 ]
 
