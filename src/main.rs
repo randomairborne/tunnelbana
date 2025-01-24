@@ -66,6 +66,9 @@ impl Termination for Error {
     }
 }
 
+const CACHE_CONTROL_TEXT: &str = "no-transform";
+static CACHE_CONTRL_VALUE: HeaderValue = HeaderValue::from_static(CACHE_CONTROL_TEXT);
+
 #[allow(clippy::too_many_lines)]
 fn main() -> Result<(), Error> {
     tracing_subscriber::fmt().with_max_level(LOG_LEVEL).init();
@@ -130,12 +133,16 @@ fn main() -> Result<(), Error> {
         HeaderValue::from_name(http::header::ACCEPT_ENCODING),
     );
 
+    let set_cache_control =
+        SetResponseHeaderLayer::appending(http::header::CACHE_CONTROL, CACHE_CONTRL_VALUE.clone());
+
     let service = ServiceBuilder::new()
         .layer(header_add_mw)
         .layer(redirect_mw)
         .layer(etag_mw)
         .layer(hide_special_files)
         .layer(set_vary)
+        .layer(set_cache_control)
         .service(serve_dir);
 
     let rt = RuntimeBuilder::new_current_thread()
