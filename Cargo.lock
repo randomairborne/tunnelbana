@@ -838,7 +838,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "tunnelbana-etags 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "tunnelbana-headers 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tunnelbana-headers 0.1.1",
  "tunnelbana-hidepaths 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tunnelbana-redirects 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "vss",
@@ -880,21 +880,6 @@ dependencies = [
 [[package]]
 name = "tunnelbana-headers"
 version = "0.1.1"
-dependencies = [
- "bytes",
- "http",
- "http-body",
- "matchit",
- "pin-project",
- "thiserror",
- "tower",
- "tower-http",
- "tracing",
-]
-
-[[package]]
-name = "tunnelbana-headers"
-version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22c63bcdad0b595428f74b22313b5b422286e76783f9c34ec5be237cfe4fd912"
 dependencies = [
@@ -905,6 +890,21 @@ dependencies = [
  "pin-project",
  "thiserror",
  "tower",
+ "tracing",
+]
+
+[[package]]
+name = "tunnelbana-headers"
+version = "0.1.2"
+dependencies = [
+ "bytes",
+ "http",
+ "http-body",
+ "matchit",
+ "pin-project",
+ "thiserror",
+ "tower",
+ "tower-http",
  "tracing",
 ]
 
@@ -983,9 +983,9 @@ checksum = "75b844d17643ee918803943289730bec8aac480150456169e647ed0b576ba539"
 
 [[package]]
 name = "unicode-ident"
-version = "1.0.14"
+version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "adb9e6ca4f869e1180728b7950e35922a7fc6397f7b641499e8f3ef06e50dc83"
+checksum = "11cd88e12b17c6494200a9c1b683a04fcac9573ed74cd1b62aeb2727c5592243"
 
 [[package]]
 name = "valuable"
