@@ -130,6 +130,7 @@ fn get_resource_tags(path: &Path) -> Result<ResourceTags, TagMapBuildError> {
 }
 
 fn file_header_hash_opt(path: &Path, ext: &str) -> Result<Option<HeaderValue>, TagMapBuildError> {
+    // we try to hash all the supported extensions here- so we don't really know if each file has those
     match file_header_hash(path, ext) {
         Err(TagMapBuildError::Io(ie)) if matches!(ie.kind(), IoErrorKind::NotFound) => Ok(None),
         v => v.map(Some),
