@@ -98,7 +98,8 @@ impl ETagMap {
     /// into their parents.
     /// # Errors
     /// This function can error if mmap fails in blake3, or if paths cannot be generated
-    pub fn new(base_dir: &Path) -> Result<Self, TagMapBuildError> {
+    pub fn new<P: AsRef<Path>>(base_dir: P) -> Result<Self, TagMapBuildError> {
+        let base_dir = base_dir.as_ref();
         let files = get_file_list(base_dir)?;
         trace!(?files, count = files.len(), "Hashing files");
 

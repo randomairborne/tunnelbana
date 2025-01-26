@@ -1,6 +1,6 @@
 [package]
 name = "tunnelbana-etags"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["valkyrie_pilot <valk@randomairborne.dev>"]
 description = "Generate etags for static files and serve them with tower."
