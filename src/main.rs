@@ -215,7 +215,7 @@ async fn shut_down(graceful: GracefulShutdown, tasks: TaskTracker) {
             error!("Waited 10 seconds for graceful shutdown, aborting...");
             return;
         }
-    };
+    }
 
     tasks.close();
 
