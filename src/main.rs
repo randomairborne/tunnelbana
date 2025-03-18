@@ -89,7 +89,7 @@ macro_rules! e {
 impl Termination for Error {
     fn report(self) -> ExitCode {
         if let Some(inner_err) = self.inner {
-            eprintln!("{inner_err}")
+            eprintln!("{inner_err}");
         }
         eprintln!(
             "{} at {}:{}:{}",
