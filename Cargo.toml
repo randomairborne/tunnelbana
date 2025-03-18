@@ -19,7 +19,7 @@ tokio-util = { version = "0.7", features = ["rt"] }
 tunnelbana-etags = { version = "0.1", path = "crates/tunnelbana-etags" }
 tunnelbana-headers = { version = "0.1", path = "crates/tunnelbana-headers" }
 tunnelbana-redirects = { version = "0.1", path = "crates/tunnelbana-redirects" }
-tunnelbana-hidepaths = { version = "0.1", path = "crates/tunnelbana-hidepaths" }
+tunnelbana-hidepaths = { version = "0.2", path = "crates/tunnelbana-hidepaths" }
 
 # http
 tower = { version = "0.5",  features = ["util"] }

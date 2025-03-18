@@ -57,11 +57,44 @@ struct Args {
 }
 
 #[derive(Debug)]
-struct Error(&'static str);
+struct Error {
+    msg: &'static str,
+    inner: Option<Box<dyn std::error::Error>>,
+    file: &'static str,
+    line: u32,
+    column: u32,
+}
+
+macro_rules! e {
+    ($str:literal) => {
+        $crate::Error {
+            msg: $str,
+            inner: None,
+            file: std::file!(),
+            line: std::line!(),
+            column: std::column!(),
+        }
+    };
+    ($str:literal, $e:expr) => {
+        $crate::Error {
+            msg: $str,
+            inner: Some(Box::new($e)),
+            file: std::file!(),
+            line: std::line!(),
+            column: std::column!(),
+        }
+    };
+}
 
 impl Termination for Error {
     fn report(self) -> ExitCode {
-        eprintln!("{}", self.0);
+        if let Some(inner_err) = self.inner {
+            eprintln!("{inner_err}")
+        }
+        eprintln!(
+            "{} at {}:{}:{}",
+            self.msg, self.file, self.line, self.column
+        );
         ExitCode::FAILURE
     }
 }
@@ -75,28 +108,28 @@ fn main() -> Result<(), Error> {
     let args: Args = argh::from_env();
     let location = Path::new(&args.directory);
     if !location.is_dir() {
-        return Err(Error("Expected argument 1 to be a directory"));
+        return Err(e!("Expected argument 1 to be a directory"));
     }
     let location = location
         .canonicalize()
-        .map_err(|_| Error("Could not canonicalize directory"))?;
+        .map_err(|e| e!("Could not canonicalize directory", e))?;
 
     let headers = read_with_default_if_nonexistent(location.join("_headers"))
-        .map_err(|_| Error("Failed to read _headers"))?;
+        .map_err(|e| e!("Failed to read _headers", e))?;
     let headers =
-        tunnelbana_headers::parse(&headers).map_err(|_| Error("Failed to parse _headers"))?;
+        tunnelbana_headers::parse(&headers).map_err(|e| e!("Failed to parse _headers", e))?;
 
     let redirects = read_with_default_if_nonexistent(location.join("_redirects"))
-        .map_err(|_| Error("Failed to read _redirects"))?;
+        .map_err(|e| e!("Failed to read _redirects", e))?;
     let redirects =
-        tunnelbana_redirects::parse(&redirects).map_err(|_| Error("Failed to parse _redirects"))?;
+        tunnelbana_redirects::parse(&redirects).map_err(|e| e!("Failed to parse _redirects", e))?;
 
-    let etags = ETagMap::new(&location).map_err(|_| Error("Failed to generate etags"))?;
+    let etags = ETagMap::new(&location).map_err(|e| e!("Failed to generate etags", e))?;
 
     let redirect_mw =
-        RedirectsLayer::new(redirects).map_err(|_| Error("Failed to build redirects router"))?;
+        RedirectsLayer::new(redirects).map_err(|e| e!("Failed to build redirects router", e))?;
     let header_add_mw =
-        HeadersLayer::new(headers).map_err(|_| Error("Failed to build headers router"))?;
+        HeadersLayer::new(headers).map_err(|e| e!("Failed to build headers router", e))?;
 
     let etag_mw = ETagLayer::new(etags);
 
@@ -126,7 +159,7 @@ fn main() -> Result<(), Error> {
         .hide_all(RESERVED_PATHS)
         .with_not_found_service(not_found_svc)
         .build()
-        .map_err(|_| Error("Failed to build path hide layer"))?;
+        .map_err(|e| e!("Failed to build path hide layer", e))?;
 
     let set_vary = SetResponseHeaderLayer::appending(
         http::header::VARY,
@@ -149,11 +182,11 @@ fn main() -> Result<(), Error> {
         .enable_all()
         .thread_name("tunnelbana-worker")
         .build()
-        .map_err(|_| Error("Invalid runtime config"))?;
+        .map_err(|e| e!("Invalid runtime config", e))?;
 
     let listener = rt
         .block_on(TcpListener::bind("0.0.0.0:8080"))
-        .map_err(|_| Error("Failed to bind to port 8080"))?;
+        .map_err(|e| e!("Failed to bind to port 8080", e))?;
 
     let server = ConnBuilder::new(TokioExecutor::new());
     let graceful = GracefulShutdown::new();
@@ -196,7 +229,7 @@ fn main() -> Result<(), Error> {
     });
 
     rt.block_on(main_task)
-        .map_err(|_| Error("Background task failed"))?;
+        .map_err(|e| e!("Background task failed", e))?;
     Ok(())
 }
 
