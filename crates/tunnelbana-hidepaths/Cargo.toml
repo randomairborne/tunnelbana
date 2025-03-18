@@ -1,6 +1,6 @@
 [package]
 name = "tunnelbana-hidepaths"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["valkyrie_pilot <valk@randomairborne.dev>"]
 description = "Hide specific paths in tower services by sending them to a 404 service."

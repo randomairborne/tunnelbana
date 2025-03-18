@@ -40,7 +40,7 @@ use tower::{Layer, Service};
 /// the not found service.
 ///
 /// The not found service defaults to [`DefaultNotFoundService`],
-/// however it is very barebones, so it is reccomended to supply your own with [`Self::with_not_found_service`].
+/// however it is very barebones, so it is recommended to supply your own with [`Self::with_not_found_service`].
 pub struct HidePathsLayerBuilder<N = DefaultNotFoundService> {
     hidden: matchit::Router<()>,
     notfound: N,
@@ -95,9 +95,9 @@ impl<N> HidePathsLayerBuilder<N> {
     /// # Errors
     /// This function errors if matchit has had any errors while inserting-
     /// you get the path that was inserted, and the error.
-    pub fn build(self) -> Result<HidePathsLayer<N>, Vec<(String, InsertError)>> {
+    pub fn build(self) -> Result<HidePathsLayer<N>, HidePathsLayerBuilderError> {
         if !self.errors.is_empty() {
-            return Err(self.errors);
+            return Err(HidePathsLayerBuilderError(self.errors));
         }
         Ok(HidePathsLayer {
             hidden: Arc::new(self.hidden),
@@ -105,6 +105,21 @@ impl<N> HidePathsLayerBuilder<N> {
         })
     }
 }
+
+#[derive(Debug)]
+pub struct HidePathsLayerBuilderError(pub Vec<(String, InsertError)>);
+
+impl std::fmt::Display for HidePathsLayerBuilderError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Could not hide the following paths due to errors: ")?;
+        for (path, err) in &self.0 {
+            write!(f, "`{path}` due to `{err}`, ")?;
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for HidePathsLayerBuilderError {}
 
 #[derive(Clone)]
 /// A [`tower::Layer`] for use with a [`tower::ServiceBuilder`] to reply with a fallback
