@@ -596,9 +596,9 @@ dependencies = [
 
 [[package]]
 name = "simpleinterpolation"
-version = "0.2.0"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0c246d870feb932a703fce36a7dbdb4f2a3060c069f2005a2d125655d4a93bc6"
+checksum = "848b24785640f36d46879280d3bfc3250a9c0132d7f949d9222c977f8b931c61"
 
 [[package]]
 name = "slab"
