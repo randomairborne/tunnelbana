@@ -87,7 +87,7 @@ impl<N> HidePathsLayerBuilder<N> {
     }
 
     /// Get a list of errors which have occured inside the builder.
-    pub fn errors(&self) -> &[(String, InsertError)] {
+    pub const fn errors(&self) -> &[(String, InsertError)] {
         self.errors.as_slice()
     }
 
