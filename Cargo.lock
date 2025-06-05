@@ -330,9 +330,9 @@ dependencies = [
 
 [[package]]
 name = "hyper-util"
-version = "0.1.13"
+version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1c293b6b3d21eca78250dc7dbebd6b9210ec5530e038cbfe0661b5c47ab06e8"
+checksum = "dc2fdfdbff08affe55bb779f33b053aa1fe5dd5b54c257343c17edfa55711bdb"
 dependencies = [
  "bytes",
  "futures-core",
@@ -820,7 +820,7 @@ dependencies = [
 
 [[package]]
 name = "tunnelbana"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "argh",
  "futures-util",
@@ -841,7 +841,7 @@ dependencies = [
 
 [[package]]
 name = "tunnelbana-etags"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "blake3",
  "bytes",
@@ -857,7 +857,7 @@ dependencies = [
 
 [[package]]
 name = "tunnelbana-headers"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "bytes",
  "http",
@@ -872,7 +872,7 @@ dependencies = [
 
 [[package]]
 name = "tunnelbana-hidepaths"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "bytes",
  "http",
@@ -888,7 +888,7 @@ dependencies = [
 
 [[package]]
 name = "tunnelbana-redirects"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "bytes",
  "http",
