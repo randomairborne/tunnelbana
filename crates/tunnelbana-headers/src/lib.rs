@@ -38,8 +38,8 @@ use std::{
 
 use bytes::Bytes;
 use http::{
-    header::{InvalidHeaderName, InvalidHeaderValue},
     HeaderName, HeaderValue, Request, Response,
+    header::{InvalidHeaderName, InvalidHeaderValue},
 };
 pub use matchit::InsertError;
 use matchit::Router;
@@ -85,7 +85,7 @@ pub fn parse(header_file: &str) -> Result<Vec<HeaderGroup>, HeaderParseError> {
                     return Err(HeaderParseError::new(
                         HeaderParseErrorKind::HeaderNameParse(e),
                         idx,
-                    ))
+                    ));
                 }
             };
             let value = match HeaderValue::from_bytes(value.trim().as_bytes()) {
@@ -94,7 +94,7 @@ pub fn parse(header_file: &str) -> Result<Vec<HeaderGroup>, HeaderParseError> {
                     return Err(HeaderParseError::new(
                         HeaderParseErrorKind::HeaderValueParse(e),
                         idx,
-                    ))
+                    ));
                 }
             };
 

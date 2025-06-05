@@ -31,7 +31,7 @@ use std::{
 
 use bytes::Bytes;
 use http::{HeaderValue, Request, Response, StatusCode};
-use http_body_util::{combinators::UnsyncBoxBody, BodyExt};
+use http_body_util::{BodyExt, combinators::UnsyncBoxBody};
 use tag_map::ResourceTagSet;
 use tower::{Layer, Service};
 

@@ -34,8 +34,8 @@ use std::{
 };
 
 use bytes::Bytes;
-use http::{header, HeaderValue, Request, Response, StatusCode};
-use http_body_util::{combinators::UnsyncBoxBody, BodyExt};
+use http::{HeaderValue, Request, Response, StatusCode, header};
+use http_body_util::{BodyExt, combinators::UnsyncBoxBody};
 pub use matchit::InsertError;
 use matchit::Router;
 use simpleinterpolation::{Interpolation, RenderError};

@@ -282,14 +282,16 @@ mod tests {
         );
         let not_found = svc.clone().oneshot(request("/example.html")).await.unwrap();
         assert_eq!(not_found.status(), StatusCode::NOT_FOUND);
-        assert!(not_found
-            .body()
-            .clone()
-            .collect()
-            .await
-            .unwrap()
-            .to_bytes()
-            .is_empty());
+        assert!(
+            not_found
+                .body()
+                .clone()
+                .collect()
+                .await
+                .unwrap()
+                .to_bytes()
+                .is_empty()
+        );
     }
 
     #[tokio::test]
