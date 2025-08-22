@@ -188,6 +188,8 @@ fn main() -> Result<(), Error> {
         .block_on(TcpListener::bind("0.0.0.0:8080"))
         .map_err(|e| e!("Failed to bind to port 8080", e))?;
 
+    info!(addr = ?listener.local_addr(), "Listening for new connections");
+
     let server = ConnBuilder::new(TokioExecutor::new());
     let graceful = GracefulShutdown::new();
     let tasks = TaskTracker::new();
