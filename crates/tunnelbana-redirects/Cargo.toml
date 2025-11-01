@@ -24,7 +24,7 @@ tracing = "0.1"
 thiserror = "2"
 
 # router
-matchit = "0.8"
+matchit = "0.9"
 simpleinterpolation = "0.2"
 
 [dev-dependencies]
