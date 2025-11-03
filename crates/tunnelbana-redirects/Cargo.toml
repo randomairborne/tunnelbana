@@ -1,6 +1,6 @@
 [package]
 name = "tunnelbana-redirects"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 authors = ["valkyrie_pilot <valk@randomairborne.dev>"]
 description = "Generate redirect lists from cloudflare-style _redirects text files and serve them with tower."
@@ -24,7 +24,7 @@ tracing = "0.1"
 thiserror = "2"
 
 # router
-matchit = "0.8"
+matchit = "0.9"
 simpleinterpolation = "0.2"
 
 [dev-dependencies]

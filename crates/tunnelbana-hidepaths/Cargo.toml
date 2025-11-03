@@ -1,6 +1,6 @@
 [package]
 name = "tunnelbana-hidepaths"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 authors = ["valkyrie_pilot <valk@randomairborne.dev>"]
 description = "Hide specific paths in tower services by sending them to a 404 service."
@@ -23,7 +23,7 @@ pin-project = "1"
 tracing = "0.1"
 
 # router
-matchit = "0.8"
+matchit = "0.9"
 
 [dev-dependencies]
 tower-http = { version = "0.6", features = ["fs"] }
