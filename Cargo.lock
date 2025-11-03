@@ -754,7 +754,7 @@ dependencies = [
 
 [[package]]
 name = "tunnelbana"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "argh",
  "futures-util",
@@ -775,7 +775,7 @@ dependencies = [
 
 [[package]]
 name = "tunnelbana-etags"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "blake3",
  "bytes",
@@ -791,7 +791,7 @@ dependencies = [
 
 [[package]]
 name = "tunnelbana-headers"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "bytes",
  "http",
@@ -806,7 +806,7 @@ dependencies = [
 
 [[package]]
 name = "tunnelbana-hidepaths"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "bytes",
  "http",
@@ -822,7 +822,7 @@ dependencies = [
 
 [[package]]
 name = "tunnelbana-redirects"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "bytes",
  "http",
