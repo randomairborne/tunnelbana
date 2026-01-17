@@ -39,7 +39,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@stable
 
       - name: Check formatting
         run: cargo doc --workspace
