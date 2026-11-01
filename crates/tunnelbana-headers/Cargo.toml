@@ -26,4 +26,4 @@ thiserror = "2"
 matchit = "0.9"
 
 [dev-dependencies]
-tower-http = { version = "0.6", features = ["fs"] }
+tower-http = { version = "0.7", features = ["fs"] }
